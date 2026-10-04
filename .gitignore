@@ -34,3 +34,6 @@ server/out/
 .DS_Store
 Thumbs.db
 *.log
+
+# Built APKs for sharing
+dist/
