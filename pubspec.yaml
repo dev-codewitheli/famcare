@@ -1,0 +1,8 @@
+# Dart pub workspace: one shared lockfile and package resolution for every Flutter project here.
+name: famcare_workspace
+publish_to: none
+environment:
+  sdk: ^3.12.0
+workspace:
+  - packages/family_core
+  - apps/homebell

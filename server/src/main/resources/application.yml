@@ -1,0 +1,51 @@
+# Default = demo mode: in-memory H2, demo bearer tokens, pushes logged instead of sent.
+# Production: SPRING_PROFILES_ACTIVE=postgres,firebase
+spring:
+  application:
+    name: famcare-server
+  datasource:
+    url: jdbc:h2:mem:famcare;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+famcare:
+  gate:
+    ring-interval: 30s   # wait this long for "Coming!" before ringing again
+    max-rings: 4         # then give up and tell the sender nobody answered
+    push-ttl: 2m         # a ring that can't be delivered within 2 minutes is dropped
+    check-every: 5s
+
+---
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/famcare}
+    username: ${DATABASE_USERNAME:famcare}
+    password: ${DATABASE_PASSWORD:famcare}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: firebase
+famcare:
+  firebase:
+    # Path to the service-account JSON (a secret — never commit it).
+    # Leave empty to use GOOGLE_APPLICATION_CREDENTIALS.
+    credentials-file: ${FIREBASE_CREDENTIALS_FILE:}

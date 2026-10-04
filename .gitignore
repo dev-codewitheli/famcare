@@ -1,0 +1,36 @@
+# ---- Secrets: never commit ----
+# Firebase app config (per project) and the server's service-account key
+google-services.json
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+.env
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+*.iml
+.idea/
+.metadata
+apps/*/android/local.properties
+apps/*/android/.gradle/
+apps/*/android/app/debug/
+apps/*/android/app/release/
+apps/*/android/key.properties
+*.jks
+*.keystore
+
+# ---- Gradle / Java (server) ----
+server/.gradle/
+server/build/
+server/bin/
+server/out/
+
+# ---- IDE / OS ----
+.vscode/
+.settings/
+.classpath
+.project
+.DS_Store
+Thumbs.db
+*.log
