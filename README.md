@@ -92,8 +92,9 @@ push, so try ringing from one emulator and answering from the other.
 
 ## Run it for real (Firebase + PostgreSQL)
 
-See [docs/SETUP.md](docs/SETUP.md) for creating the Firebase project, enabling Google sign-in,
-and deploying the server.
+- [docs/SETUP.md](docs/SETUP.md): create the Firebase project and enable Google sign-in.
+- [docs/DEPLOY.md](docs/DEPLOY.md): deploy the server to Render with Neon PostgreSQL, then build
+  the signed release APK.
 
 ## Tests
 

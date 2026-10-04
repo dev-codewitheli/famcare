@@ -8,10 +8,11 @@
 - [x] Server-side re-ring (every 30 s) and expiry after 4 rings → "Nobody answered"
 - [x] Sender can cancel ("I got in")
 - [x] Reliability checklist: notifications, full-screen intent, battery optimization, OEM tips
-- [ ] Create the Firebase project and connect the app (see SETUP.md)
-- [ ] Deploy the server + PostgreSQL
+- [x] Create the Firebase project and connect the app (see SETUP.md)
+- [x] Deployable: Dockerfile + Render blueprint, verified on PostgreSQL 17
+- [ ] Deploy the server (Render) + PostgreSQL (Neon), see DEPLOY.md
 - [ ] Distribute to the family via Firebase App Distribution
-- [ ] Release signing config
+- [x] Release signing config (key kept outside the repo)
 
 ## v0.2: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day

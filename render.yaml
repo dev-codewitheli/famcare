@@ -1,0 +1,29 @@
+# Render Blueprint: deploys the FamCare server as a free Docker web service.
+# In Render: New → Blueprint → connect this repo. It reads this file.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# After the first deploy, in the service's dashboard:
+#   1. Environment → set the three DATABASE_* values from Neon (see docs/DEPLOY.md).
+#   2. Environment → Secret Files → add "firebase-service-account.json" with the
+#      contents of the Firebase service-account key. Never commit that key.
+services:
+  - type: web
+    name: famcare-server
+    runtime: docker
+    plan: free
+    region: singapore          # closest Render region to the Philippines
+    dockerContext: ./server
+    dockerfilePath: ./server/Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: postgres,firebase
+      - key: FIREBASE_CREDENTIALS_FILE
+        value: /etc/secrets/firebase-service-account.json
+      # jdbc:postgresql://<neon-host>/<db>?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
