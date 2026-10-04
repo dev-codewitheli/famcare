@@ -132,10 +132,20 @@ class _ReliabilityScreenState extends State<ReliabilityScreen> with WidgetsBindi
                           const SizedBox(height: 8),
                           Text(brandTip),
                           const SizedBox(height: 8),
-                          TextButton.icon(
-                            onPressed: DeviceSettings.openAppSettings,
-                            icon: const Icon(Icons.settings),
-                            label: const Text('Open HomeBell settings'),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              FilledButton.tonalIcon(
+                                onPressed: DeviceSettings.openAutostartSettings,
+                                icon: const Icon(Icons.restart_alt),
+                                label: const Text('Open Autostart settings'),
+                              ),
+                              TextButton.icon(
+                                onPressed: DeviceSettings.openAppSettings,
+                                icon: const Icon(Icons.settings),
+                                label: const Text('Open HomeBell settings'),
+                              ),
+                            ],
                           ),
                         ],
                       ),

@@ -43,8 +43,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     }
     _startPolling();
-    _checkSetup();
+    _askForNotificationsThenCheckSetup();
     GateNotifications.launchResponse().then(_handleResponse);
+  }
+
+  /// Without this permission (Android 13+) every ring is silently dropped, so ask up front
+  /// instead of waiting for the user to find the checklist. Android itself stops showing the
+  /// prompt after it's been denied twice; the checklist then links to settings.
+  Future<void> _askForNotificationsThenCheckSetup() async {
+    if (!await GateNotifications.areEnabled()) await GateNotifications.requestPermission();
+    await _checkSetup();
   }
 
   @override

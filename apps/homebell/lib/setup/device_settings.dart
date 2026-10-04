@@ -20,4 +20,8 @@ class DeviceSettings {
       _channel.invokeMethod('requestIgnoreBatteryOptimizations');
 
   static Future<void> openAppSettings() => _channel.invokeMethod('openAppSettings');
+
+  /// Opens the brand's autostart screen (Xiaomi, Oppo/Realme, Vivo, Infinix/Tecno), or the
+  /// app's settings if this phone doesn't have one we know.
+  static Future<void> openAutostartSettings() => _channel.invokeMethod('openAutostartSettings');
 }
