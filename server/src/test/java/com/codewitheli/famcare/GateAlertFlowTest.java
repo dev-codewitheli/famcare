@@ -71,6 +71,12 @@ class GateAlertFlowTest {
     }
 
     @Test
+    void livenessIsPublicForPlatformHealthChecks() {
+        assertThat(mvc.get().uri("/actuator/health/liveness")).hasStatusOk()
+                .bodyJson().extractingPath("$.status").isEqualTo("UP");
+    }
+
+    @Test
     void signedInUserWithoutAFamilyIsToldToJoinOne() {
         assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer stranger"))
                 .hasStatus(409)

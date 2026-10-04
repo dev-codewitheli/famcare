@@ -31,7 +31,8 @@ The server runs as a free Docker web service on **Render** (Singapore region), w
 ## 3. Keep it awake
 Render's free tier sleeps after 15 minutes without traffic. A sleeping server delays the
 first ring by about 50 s and pauses re-rings. Use a free uptime monitor, such as
-<https://cron-job.org> or UptimeRobot, to request `/actuator/health` every 10 minutes.
+<https://cron-job.org> or UptimeRobot, to request `/actuator/health/liveness` every 10 minutes.
+That endpoint doesn't query the database, so Neon still scales to zero between uses.
 One always-on service fits within Render's free monthly hours.
 
 ## 4. Release APK

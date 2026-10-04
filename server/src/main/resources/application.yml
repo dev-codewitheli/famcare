@@ -21,6 +21,12 @@ management:
     web:
       exposure:
         include: health
+  # /actuator/health/liveness answers without querying the database, so platform health
+  # checks and keep-awake pings don't stop a serverless database (Neon) from sleeping.
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 famcare:
   gate:

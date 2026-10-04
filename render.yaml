@@ -14,7 +14,7 @@ services:
     region: singapore          # closest Render region to the Philippines
     dockerContext: ./server
     dockerfilePath: ./server/Dockerfile
-    healthCheckPath: /actuator/health
+    healthCheckPath: /actuator/health/liveness   # no DB query, so Neon can sleep
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: postgres,firebase
