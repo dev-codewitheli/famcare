@@ -12,10 +12,16 @@ class PushRegistration {
   final FamilyApi _familyApi;
   StreamSubscription<String>? _refreshes;
 
+  /// Never throws: a push problem must not lock the user out of the app (it still works
+  /// while open, by polling). Failures are logged, and the next start or refresh retries.
   Future<void> start() async {
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) await _register(token);
     _refreshes ??= FirebaseMessaging.instance.onTokenRefresh.listen(_register);
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await _register(token);
+    } catch (e) {
+      debugPrint('Push token unavailable: $e');
+    }
   }
 
   Future<void> stop() async {

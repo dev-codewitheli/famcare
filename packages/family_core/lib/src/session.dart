@@ -46,6 +46,7 @@ class Session extends ChangeNotifier {
       if (e.statusCode == 401) return signOut();
       _set(SessionStatus.error, e.message);
     } catch (e) {
+      debugPrint('Session refresh failed: $e');
       _set(SessionStatus.error, "Can't reach the server. Check your connection.");
     }
   }
