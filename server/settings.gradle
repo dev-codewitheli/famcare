@@ -1,1 +1,10 @@
+// Cloud build servers share IPs and get rate-limited by Maven Central (HTTP 429), so resolve
+// plugins and libraries from Google's Maven Central mirror first, falling back to the originals.
+pluginManagement {
+    repositories {
+        maven { url = 'https://maven-central.storage-download.googleapis.com/maven2/' }
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = 'famcare-server'

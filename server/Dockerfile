@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy build definition first for better layer caching
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
-RUN chmod +x gradlew && ./gradlew --no-daemon dependencies > /dev/null
+RUN chmod +x gradlew
 
 # Copy sources and build the boot jar
 COPY src ./src
