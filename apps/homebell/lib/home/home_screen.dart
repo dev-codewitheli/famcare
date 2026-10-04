@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     GateNotifications.responses.addListener(_onNotificationResponse);
+    _gate.addListener(_stopRingWhenAlertEnds);
     if (widget.usesPush) {
       // In the foreground, pushes come here instead of the background handler.
       _pushes = FirebaseMessaging.onMessage.listen((m) async {
@@ -59,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     GateNotifications.responses.removeListener(_onNotificationResponse);
+    _gate.removeListener(_stopRingWhenAlertEnds);
     _poll?.cancel();
     _pushes?.cancel();
     _gate.dispose();
@@ -89,15 +91,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _onNotificationResponse() => _handleResponse(GateNotifications.responses.value);
 
+  /// Backup for a late or lost "stop ringing" push: once polling shows the alert this phone
+  /// was ringing for has ended (answered, cancelled, or expired), silence it locally.
+  String? _ringingFor;
+
+  void _stopRingWhenAlertEnds() {
+    final state = _gate.state;
+    final current = state is SomeoneAtGate ? state.alert.id : null;
+    final previous = _ringingFor;
+    if (previous != null && previous != current) GateNotifications.cancelRing(previous);
+    _ringingFor = current;
+  }
+
+  /// A tap on the ring notification, or the full-screen alert opening the app over the lock
+  /// screen. Opening the app must NOT stop the ring: like an incoming call, it keeps ringing
+  /// while the screen shows "… is at the gate" until someone actually answers.
   Future<void> _handleResponse(NotificationResponse? response) async {
     final alertId = response?.payload;
     if (alertId == null || alertId == 'test') return;
-    await GateNotifications.cancelRing(alertId);
     if (response!.actionId == GateNotifications.comingActionId) {
-      await _gate.coming(alertId);
+      await _answer(alertId);
     } else {
       await _gate.refresh();
     }
+  }
+
+  /// "Coming!" The server tells everyone else to stop ringing; this phone stops its own ring.
+  Future<void> _answer(String alertId) async {
+    await _gate.coming(alertId);
+    if (_gate.error == null) await GateNotifications.cancelRing(alertId);
   }
 
   @override
@@ -153,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       Ringing(:final alert) => _RingingView(
                           alert: alert, busy: _gate.busy, onCancel: () => _gate.cancel(alert.id)),
                       SomeoneAtGate(:final alert) => _SomeoneAtGateView(
-                          alert: alert, busy: _gate.busy, onComing: () => _gate.coming(alert.id)),
+                          alert: alert, busy: _gate.busy, onComing: () => _answer(alert.id)),
                       Outcome(:final alert) => _OutcomeView(alert: alert, onDone: _gate.dismissOutcome),
                     },
                   ),

@@ -30,11 +30,11 @@ class ReliabilityStatus {
 /// Brands that stop background apps aggressively, with what to switch on. Very common in the
 /// Philippines, and the #1 reason pushes arrive late or not at all. See dontkillmyapp.com.
 const _brandTips = <String, String>{
-  'xiaomi': 'Settings → Apps → HomeBell: turn on Autostart, and set Battery saver to "No restrictions".',
-  'redmi': 'Settings → Apps → HomeBell: turn on Autostart, and set Battery saver to "No restrictions".',
-  'poco': 'Settings → Apps → HomeBell: turn on Autostart, and set Battery saver to "No restrictions".',
-  'oppo': 'Settings → Apps → HomeBell → Battery: allow background activity and auto launch.',
-  'realme': 'Settings → Apps → HomeBell → Battery: allow background activity and auto launch.',
+  'xiaomi': 'Settings → Apps → HomeBell: turn on Autostart, set Battery saver to "No restrictions", and under Other permissions allow "Show on Lock screen" and "Display pop-up windows while running in the background".',
+  'redmi': 'Settings → Apps → HomeBell: turn on Autostart, set Battery saver to "No restrictions", and under Other permissions allow "Show on Lock screen" and "Display pop-up windows while running in the background".',
+  'poco': 'Settings → Apps → HomeBell: turn on Autostart, set Battery saver to "No restrictions", and under Other permissions allow "Show on Lock screen" and "Display pop-up windows while running in the background".',
+  'oppo': 'Settings → Apps → HomeBell → Battery: allow background activity and auto launch. Under Notifications, allow lock screen notifications.',
+  'realme': 'Settings → Apps → HomeBell → Battery: allow background activity and auto launch. Under Notifications, allow lock screen notifications.',
   'oneplus': 'Settings → Apps → HomeBell → Battery: allow background activity.',
   'vivo': 'Settings → Battery → Background power consumption: allow HomeBell. Also enable Autostart.',
   'infinix': 'Phone Master → Auto-start management: allow HomeBell. Lock it in recent apps.',
