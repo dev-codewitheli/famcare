@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -16,13 +17,15 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        // Reliability checks the Flutter plugins don't expose; see lib/setup/device_settings.dart.
+        // Reliability checks and OEM settings screens the Flutter plugins don't expose;
+        // see lib/setup/device_settings.dart.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "homebell/device_settings")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())
                     "isIgnoringBatteryOptimizations" -> result.success(isIgnoringBatteryOptimizations())
                     "manufacturer" -> result.success(Build.MANUFACTURER)
+                    "alarmVolumePercent" -> result.success(alarmVolumePercent())
                     "requestIgnoreBatteryOptimizations" -> {
                         // Shows the system "Let app always run in background?" dialog.
                         startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -33,7 +36,16 @@ class MainActivity : FlutterActivity() {
                         openAppDetails()
                         result.success(null)
                     }
-                    "openAutostartSettings" -> result.success(openAutostartSettings())
+                    "openSoundSettings" -> result.success(tryStart(Intent(Settings.ACTION_SOUND_SETTINGS)))
+                    "openChannelSettings" -> {
+                        val channelId = call.argument<String>("channelId")!!
+                        result.success(tryStart(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                            .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)) || openAppDetails())
+                    }
+                    "openAutostartSettings" -> result.success(openFirst(AUTOSTART_SCREENS))
+                    "openOemPermissions" -> result.success(openOemPermissions())
+                    "openOemBatterySettings" -> result.success(openFirst(BATTERY_SCREENS))
                     else -> result.notImplemented()
                 }
             }
@@ -46,38 +58,71 @@ class MainActivity : FlutterActivity() {
         return manager.canUseFullScreenIntent()
     }
 
-    private fun openAppDetails() {
-        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", packageName, null)))
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return power.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    /** Gate rings play on the alarm stream, so a muted alarm volume means a silent ring. */
+    private fun alarmVolumePercent(): Int {
+        val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM).coerceAtLeast(1)
+        return audio.getStreamVolume(AudioManager.STREAM_ALARM) * 100 / max
+    }
+
+    private fun openAppDetails(): Boolean = tryStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", packageName, null)))
+
+    /**
+     * Xiaomi's hidden "Other permissions" page, where "Show on Lock screen" and "Display pop-up
+     * windows while running in the background" live. Falls back to the app's settings.
+     */
+    private fun openOemPermissions(): Boolean {
+        val miui = Intent("miui.intent.action.APP_PERM_EDITOR").putExtra("extra_pkgname", packageName)
+        val editors = listOf(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity"),
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity"),
+        )
+        return editors.any { tryStart(Intent(miui).setComponent(it)) } || tryStart(miui) || openAppDetails()
     }
 
     /**
-     * Opens the OEM "autostart" screen. Without autostart, Xiaomi and similar phones won't let a
-     * closed app wake up for a push. These screens aren't public APIs, so try the known ones and
-     * fall back to the app's settings. Returns true if an OEM screen opened.
+     * OEM screens aren't public APIs and move between OS versions, so try the known ones and fall
+     * back to the app's settings. Returns true if a brand-specific screen opened.
      */
-    private fun openAutostartSettings(): Boolean {
-        val candidates = listOf(
-            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
-            ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
-            ComponentName("com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"),
-            ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
-            ComponentName("com.transsion.phonemaster", "com.cyin.himgr.autostart.AutoStartActivity"),
-        )
-        for (component in candidates) {
-            try {
-                startActivity(Intent().setComponent(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                return true
-            } catch (_: Exception) {
-                // Not this brand (or hidden on this OS version); try the next one.
-            }
-        }
+    private fun openFirst(screens: List<ComponentName>): Boolean {
+        if (screens.any { tryStart(Intent().setComponent(it)) }) return true
         openAppDetails()
         return false
     }
 
-    private fun isIgnoringBatteryOptimizations(): Boolean {
-        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
-        return power.isIgnoringBatteryOptimizations(packageName)
+    private fun tryStart(intent: Intent): Boolean = try {
+        startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: Exception) {
+        // Not on this brand or OS version.
+        false
+    }
+
+    private companion object {
+        /** Without autostart, these brands won't let a closed app wake up for a push. */
+        val AUTOSTART_SCREENS = listOf(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+            ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+            ComponentName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+            ComponentName("com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"),
+            ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+            ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"),
+            ComponentName("com.transsion.phonemaster", "com.cyin.himgr.autostart.AutoStartActivity"),
+        )
+
+        /** Where each brand hides "let this app run in the background". */
+        val BATTERY_SCREENS = listOf(
+            ComponentName("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"),
+            ComponentName("com.samsung.android.sm", "com.samsung.android.sm.battery.ui.BatteryActivity"),
+            ComponentName("com.vivo.abe", "com.vivo.applicationbehaviorengine.ui.ExcessivePowerManagerActivity"),
+            ComponentName("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity"),
+            ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"),
+        )
     }
 }

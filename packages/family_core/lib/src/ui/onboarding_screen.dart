@@ -39,7 +39,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_busy || !_formKey.currentState!.validate()) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -67,42 +67,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your family'),
-        actions: [
-          TextButton(onPressed: widget.session.signOut, child: const Text('Sign out')),
-        ],
+        actions: [TextButton(onPressed: widget.session.signOut, child: const Text('Sign out'))],
       ),
       body: SafeArea(
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
             children: [
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: true, label: Text('Join'), icon: Icon(Icons.group_add)),
-                  ButtonSegment(value: false, label: Text('Start new'), icon: Icon(Icons.home)),
+              Text('Set up your family', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text('Everyone in the family uses the same group.',
+                  style: theme.textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant)),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ChoiceCard(
+                      selected: _joining,
+                      icon: Icons.group_add_rounded,
+                      title: 'Join',
+                      subtitle: 'I have an invite code',
+                      onTap: () => setState(() => _joining = true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ChoiceCard(
+                      selected: !_joining,
+                      icon: Icons.home_rounded,
+                      title: 'Start new',
+                      subtitle: "I'm the first one",
+                      onTap: () => setState(() => _joining = false),
+                    ),
+                  ),
                 ],
-                selected: {_joining},
-                onSelectionChanged: (s) => setState(() => _joining = s.first),
               ),
               const SizedBox(height: 24),
-              Text(
-                _joining
-                    ? 'Ask whoever set up the family for the 6-letter invite code.'
-                    : "You'll get an invite code to share with the rest of the family.",
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
               if (_joining)
                 TextFormField(
                   controller: _inviteCode,
                   textCapitalization: TextCapitalization.characters,
                   maxLength: 6,
+                  style: theme.textTheme.titleLarge?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w700),
                   decoration: const InputDecoration(
-                      labelText: 'Invite code', border: OutlineInputBorder()),
+                    labelText: 'Invite code',
+                    helperText: 'Ask whoever set up the family for the 6-letter code',
+                    prefixIcon: Icon(Icons.vpn_key_rounded),
+                  ),
                   validator: (v) => (v ?? '').trim().length == 6 ? null : 'Enter all 6 characters',
                 )
               else
@@ -110,8 +125,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   controller: _familyName,
                   maxLength: 80,
                   decoration: const InputDecoration(
-                      labelText: 'Family name', hintText: 'e.g. Centeno Family',
-                      border: OutlineInputBorder()),
+                    labelText: 'Family name',
+                    hintText: 'e.g. Centeno Family',
+                    prefixIcon: Icon(Icons.house_rounded),
+                  ),
                   validator: _required,
                 ),
               const SizedBox(height: 8),
@@ -122,20 +139,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   labelText: 'What does the family call you?',
                   hintText: 'e.g. Papa, Ate, Eli',
                   helperText: 'Only this nickname is shown to your family',
-                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.badge_rounded),
                 ),
                 validator: _required,
               ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _busy ? null : _submit,
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                child: Text(_joining ? 'Join family' : 'Create family'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+                child: _busy
+                    ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : Text(_joining ? 'Join family' : 'Create family'),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: colors.error)),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChoiceCard extends StatelessWidget {
+  const _ChoiceCard({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? colors.primaryContainer : colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: selected ? colors.primary : Colors.transparent, width: 2),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: selected ? colors.primary : colors.onSurfaceVariant, size: 28),
+              const SizedBox(height: 12),
+              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),

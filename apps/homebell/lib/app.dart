@@ -11,14 +11,15 @@ class HomeBellApp extends StatelessWidget {
   final Session session;
   final GateApi gateApi;
 
+  static const _brand = Color(0xFFE07A1F);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HomeBell',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xFFE07A1F), useMaterial3: true),
-      darkTheme: ThemeData(
-          colorSchemeSeed: const Color(0xFFE07A1F), brightness: Brightness.dark, useMaterial3: true),
+      theme: FamilyTheme.light(_brand),
+      darkTheme: FamilyTheme.dark(_brand),
       home: ListenableBuilder(
         listenable: session,
         builder: (context, _) => switch (session.status) {
@@ -27,7 +28,12 @@ class HomeBellApp extends StatelessWidget {
               session: session,
               appName: 'HomeBell',
               tagline: "Ring the family when you're at the gate.",
-              icon: Icons.notifications_active,
+              icon: Icons.notifications_active_rounded,
+              highlights: const [
+                SignInHighlight(Icons.ring_volume_rounded, 'One tap rings every phone at home, even locked'),
+                SignInHighlight(Icons.directions_run_rounded, 'See who\'s coming to open the gate'),
+                SignInHighlight(Icons.lock_rounded, 'Private: your family only sees a nickname'),
+              ],
             ),
           SessionStatus.needsFamily => OnboardingScreen(session: session),
           SessionStatus.ready => HomeScreen(

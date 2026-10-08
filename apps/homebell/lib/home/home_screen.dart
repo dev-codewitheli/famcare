@@ -8,7 +8,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../gate/gate_api.dart';
 import '../gate/gate_controller.dart';
 import '../gate/gate_notifications.dart';
-import '../setup/reliability_screen.dart';
+import '../settings/settings_screen.dart';
+import '../setup/phone_setup.dart';
+import '../setup/setup_screen.dart';
+import 'activity_controller.dart';
+import 'home_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.session, required this.gateApi, required this.usesPush});
@@ -24,9 +28,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  late final GateController _gate =
-      GateController(api: widget.gateApi, myMemberId: widget.session.family!.me.id);
+  late final String _myId = widget.session.family!.me.id;
+  late final GateController _gate = GateController(api: widget.gateApi, myMemberId: _myId);
+  late final ActivityController _activity = ActivityController(api: widget.gateApi, myMemberId: _myId);
   Timer? _poll;
+  int _ticks = 0;
   StreamSubscription<RemoteMessage>? _pushes;
   bool _setupNeeded = false;
 
@@ -40,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // In the foreground, pushes come here instead of the background handler.
       _pushes = FirebaseMessaging.onMessage.listen((m) async {
         await GateNotifications.handlePush(m.data);
-        await _gate.refresh();
+        await Future.wait([_gate.refresh(), _activity.refresh()]);
       });
     }
     _startPolling();
@@ -49,8 +55,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   /// Without this permission (Android 13+) every ring is silently dropped, so ask up front
-  /// instead of waiting for the user to find the checklist. Android itself stops showing the
-  /// prompt after it's been denied twice; the checklist then links to settings.
+  /// instead of waiting for the user to find the setup screen. Android itself stops showing the
+  /// prompt after it's been denied twice; the setup screen then links to settings.
   Future<void> _askForNotificationsThenCheckSetup() async {
     if (!await GateNotifications.areEnabled()) await GateNotifications.requestPermission();
     await _checkSetup();
@@ -64,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _poll?.cancel();
     _pushes?.cancel();
     _gate.dispose();
+    _activity.dispose();
     super.dispose();
   }
 
@@ -78,14 +85,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   /// Polling backs up push while the app is open (and is the only channel in demo mode).
+  /// The activity list changes slowly, so it refreshes every third tick.
   void _startPolling() {
     _poll?.cancel();
     _gate.refresh();
-    _poll = Timer.periodic(Duration(seconds: widget.usesPush ? 10 : 3), (_) => _gate.refresh());
+    _activity.refresh();
+    _poll = Timer.periodic(Duration(seconds: widget.usesPush ? 10 : 3), (_) {
+      _gate.refresh();
+      if (++_ticks % 3 == 0) _activity.refresh();
+    });
   }
 
   Future<void> _checkSetup() async {
-    final status = await ReliabilityStatus.check();
+    final status = await PhoneSetupStatus.check();
     if (mounted) setState(() => _setupNeeded = !status.allGood);
   }
 
@@ -99,7 +111,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final state = _gate.state;
     final current = state is SomeoneAtGate ? state.alert.id : null;
     final previous = _ringingFor;
-    if (previous != null && previous != current) GateNotifications.cancelRing(previous);
+    if (previous != null && previous != current) {
+      GateNotifications.cancelRing(previous);
+      _activity.refresh();
+    }
     _ringingFor = current;
   }
 
@@ -120,198 +135,114 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _answer(String alertId) async {
     await _gate.coming(alertId);
     if (_gate.error == null) await GateNotifications.cancelRing(alertId);
+    await _activity.refresh();
   }
+
+  Future<void> _ring() async {
+    await _gate.ring();
+    await _activity.refresh();
+  }
+
+  Future<void> _announce(int minutes) async {
+    final error = await _activity.announce(minutes);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error ?? 'Family notified: you\'re about $minutes min away'),
+    ));
+  }
+
+  void _open(Widget screen) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).then((_) => _checkSetup());
 
   @override
   Widget build(BuildContext context) {
+    final family = widget.session.family!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('HomeBell'),
-        actions: [
-          IconButton(
-            tooltip: 'Reliability checklist',
-            icon: Badge(isLabelVisible: _setupNeeded, child: const Icon(Icons.verified_user_outlined)),
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const ReliabilityScreen()))
-                .then((_) => _checkSetup()),
-          ),
-          IconButton(
-            tooltip: 'Family',
-            icon: const Icon(Icons.groups_outlined),
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => FamilyScreen(session: widget.session))),
-          ),
-        ],
-      ),
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: _gate,
-          builder: (context, _) => Column(
-            children: [
-              if (_setupNeeded)
-                MaterialBanner(
-                  content: const Text('Finish setup so you never miss a ring.'),
-                  leading: const Icon(Icons.warning_amber),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context)
-                          .push(MaterialPageRoute(builder: (_) => const ReliabilityScreen()))
-                          .then((_) => _checkSetup()),
-                      child: const Text('Fix now'),
-                    ),
-                  ],
-                ),
-              if (_gate.error != null)
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(_gate.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: switch (_gate.state) {
-                      Idle() => _GateButton(busy: _gate.busy, onPressed: _gate.ring),
-                      Ringing(:final alert) => _RingingView(
-                          alert: alert, busy: _gate.busy, onCancel: () => _gate.cancel(alert.id)),
-                      SomeoneAtGate(:final alert) => _SomeoneAtGateView(
-                          alert: alert, busy: _gate.busy, onComing: () => _answer(alert.id)),
-                      Outcome(:final alert) => _OutcomeView(alert: alert, onDone: _gate.dismissOutcome),
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The big "I'm at the gate" button.
-class _GateButton extends StatelessWidget {
-  const _GateButton({required this.busy, required this.onPressed});
-
-  final bool busy;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox.square(
-          dimension: 240,
-          child: FilledButton(
-            onPressed: busy ? null : onPressed,
-            style: FilledButton.styleFrom(shape: const CircleBorder(), elevation: 6),
-            child: busy
-                ? CircularProgressIndicator(color: colors.onPrimary)
-                : const Column(
-                    mainAxisSize: MainAxisSize.min,
+          listenable: Listenable.merge([_gate, _activity]),
+          builder: (context, _) {
+            final state = _gate.state;
+            final canAnnounce = state is Idle || state is Outcome;
+            return RefreshIndicator(
+              onRefresh: () => Future.wait([_gate.refresh(), _activity.refresh()]),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                children: [
+                  Row(
                     children: [
-                      Icon(Icons.notifications_active, size: 72),
-                      SizedBox(height: 12),
-                      Text("I'm at the gate", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Hi, ${family.me.displayName}',
+                                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+                            Text(family.name, style: theme.textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        tooltip: 'Settings',
+                        icon: Badge(isLabelVisible: _setupNeeded, child: const Icon(Icons.settings_rounded)),
+                        onPressed: () => _open(SettingsScreen(session: widget.session)),
+                      ),
                     ],
                   ),
-          ),
+                  const SizedBox(height: 16),
+                  FamilyStrip(
+                    members: family.members.where((m) => m.id != family.me.id).toList(),
+                    onTap: () => _open(FamilyScreen(session: widget.session)),
+                  ),
+                  if (_setupNeeded) ...[
+                    const SizedBox(height: 16),
+                    SetupBanner(onTap: () => _open(const SetupScreen())),
+                  ],
+                  if (_gate.error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_gate.error!, style: TextStyle(color: colors.error)),
+                  ],
+                  const SizedBox(height: 20),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: switch (state) {
+                      Idle() => GateButtonCard(key: const ValueKey('idle'), busy: _gate.busy, onRing: _ring),
+                      Ringing(:final alert) => RingingCard(
+                          key: const ValueKey('ringing'),
+                          alert: alert,
+                          busy: _gate.busy,
+                          onCancel: () => _gate.cancel(alert.id)),
+                      SomeoneAtGate(:final alert) => SomeoneAtGateCard(
+                          key: const ValueKey('someone'),
+                          alert: alert,
+                          busy: _gate.busy,
+                          onComing: () => _answer(alert.id)),
+                      Outcome(:final alert) => OutcomeCard(
+                          key: const ValueKey('outcome'), alert: alert, onDone: _gate.dismissOutcome),
+                    },
+                  ),
+                  for (final arrival in _activity.othersOnTheWay) ...[
+                    const SizedBox(height: 12),
+                    OnTheWayCard(arrival: arrival),
+                  ],
+                  if (canAnnounce) ...[
+                    const SizedBox(height: 20),
+                    OnMyWayCard(
+                      myArrival: _activity.myArrival,
+                      busy: _activity.announcing,
+                      onAnnounce: _announce,
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  RecentActivity(alerts: _activity.recent, myMemberId: _myId),
+                ],
+              ),
+            );
+          },
         ),
-        const SizedBox(height: 24),
-        Text('Rings everyone at home until someone answers.',
-            textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
-      ],
-    );
-  }
-}
-
-class _RingingView extends StatelessWidget {
-  const _RingingView({required this.alert, required this.busy, required this.onCancel});
-
-  final GateAlert alert;
-  final bool busy;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.ring_volume, size: 96, color: theme.colorScheme.primary),
-        const SizedBox(height: 16),
-        Text('Ringing the family…', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text('Ring ${alert.ringCount} · waiting for someone to tap "Coming!"', textAlign: TextAlign.center),
-        const SizedBox(height: 32),
-        OutlinedButton.icon(
-          onPressed: busy ? null : onCancel,
-          icon: const Icon(Icons.close),
-          label: const Text('Cancel, I got in'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SomeoneAtGateView extends StatelessWidget {
-  const _SomeoneAtGateView({required this.alert, required this.busy, required this.onComing});
-
-  final GateAlert alert;
-  final bool busy;
-  final VoidCallback onComing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.door_front_door, size: 96, color: theme.colorScheme.error),
-        const SizedBox(height: 16),
-        Text('${alert.sender.displayName} is at the gate',
-            textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
-        const SizedBox(height: 32),
-        FilledButton.icon(
-          onPressed: busy ? null : onComing,
-          icon: const Icon(Icons.directions_run, size: 32),
-          label: const Text('Coming!', style: TextStyle(fontSize: 24)),
-          style: FilledButton.styleFrom(minimumSize: const Size(240, 72)),
-        ),
-      ],
-    );
-  }
-}
-
-class _OutcomeView extends StatelessWidget {
-  const _OutcomeView({required this.alert, required this.onDone});
-
-  final GateAlert alert;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final answered = alert.status == GateAlertStatus.acknowledged;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(answered ? Icons.check_circle : Icons.phone_missed,
-            size: 96, color: answered ? Colors.green.shade600 : theme.colorScheme.error),
-        const SizedBox(height: 16),
-        Text(
-          answered ? '${alert.acknowledgedBy?.displayName ?? 'Someone'} is coming!' : 'Nobody answered',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(answered ? 'Hang tight, the gate will be opened soon.' : 'Try calling someone at home.',
-            textAlign: TextAlign.center),
-        const SizedBox(height: 32),
-        FilledButton.tonal(onPressed: onDone, child: const Text('OK')),
-      ],
+      ),
     );
   }
 }

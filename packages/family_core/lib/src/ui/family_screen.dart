@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../session.dart';
+import 'family_theme.dart';
 
 /// Members and the invite code to share with relatives who haven't joined yet.
 class FamilyScreen extends StatelessWidget {
@@ -14,6 +15,7 @@ class FamilyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final family = session.family!;
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: Text(family.name)),
@@ -23,37 +25,61 @@ class FamilyScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             Card(
-              child: ListTile(
-                leading: const Icon(Icons.vpn_key),
-                title: const Text('Invite code'),
-                subtitle: Text(family.inviteCode,
-                    style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 4)),
-                trailing: IconButton(
-                  tooltip: 'Copy',
-                  icon: const Icon(Icons.copy),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: family.inviteCode));
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(const SnackBar(content: Text('Invite code copied')));
-                  },
+              color: colors.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Invite code', style: theme.textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(family.inviteCode,
+                              style: theme.textTheme.displaySmall
+                                  ?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w800)),
+                        ),
+                        IconButton.filledTonal(
+                          tooltip: 'Copy',
+                          icon: const Icon(Icons.copy_rounded),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: family.inviteCode));
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(content: Text('Invite code copied')));
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Share it with family members so they can join from their phones.',
+                        style: theme.textTheme.bodySmall),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text('Members', style: theme.textTheme.titleMedium),
-            for (final member in family.members)
-              ListTile(
-                leading: CircleAvatar(child: Text(member.displayName.characters.first.toUpperCase())),
-                title: Text(member.id == family.me.id ? '${member.displayName} (you)' : member.displayName),
-                subtitle: member.role == MemberRole.parent ? const Text('Set up the family') : null,
+            const SizedBox(height: 24),
+            Text('${family.members.length} members', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Card(
+              child: Column(
+                children: [
+                  for (final member in family.members)
+                    ListTile(
+                      leading: MemberAvatar(name: member.displayName),
+                      title: Text(member.id == family.me.id ? '${member.displayName} (you)' : member.displayName),
+                      subtitle: member.role == MemberRole.parent ? const Text('Set up the family') : null,
+                    ),
+                ],
               ),
+            ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).popUntil((route) => route.isFirst);
                 session.signOut();
               },
-              icon: const Icon(Icons.logout),
+              icon: const Icon(Icons.logout_rounded),
               label: const Text('Sign out'),
             ),
           ],

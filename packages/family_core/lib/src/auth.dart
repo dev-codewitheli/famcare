@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Who is signed in on this phone. Works in background isolates too (push handlers),
@@ -17,8 +18,13 @@ abstract class AuthService {
 }
 
 /// Google sign-in via Firebase Authentication.
+///
+/// Uses Android's native account picker (Credential Manager) rather than a browser
+/// redirect: the browser flow could leave users stranded in Chrome after signing in, and a
+/// second attempt failed with Firebase's "missing initial state" error.
 class FirebaseAuthService implements AuthService {
   FirebaseAuth get _auth => FirebaseAuth.instance;
+  Future<void>? _googleReady;
 
   @override
   String? get uid => _auth.currentUser?.uid;
@@ -32,13 +38,33 @@ class FirebaseAuthService implements AuthService {
     await _auth.authStateChanges().first;
   }
 
-  Future<void> signInWithGoogle() => _auth.signInWithProvider(GoogleAuthProvider());
+  /// Shows the account picker. Returns false if the user backed out of it.
+  /// On Android the plugin reads the web client id from google-services.json.
+  Future<bool> signInWithGoogle() async {
+    await (_googleReady ??= GoogleSignIn.instance.initialize());
+    final GoogleSignInAccount account;
+    try {
+      account = await GoogleSignIn.instance.authenticate();
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return false;
+      rethrow;
+    }
+    final idToken = account.authentication.idToken;
+    if (idToken == null) throw StateError('Google did not return an ID token');
+    await _auth.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
+    return true;
+  }
 
   @override
   Future<String?> idToken() async => _auth.currentUser?.getIdToken();
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    // Also forget the picked account, so the next sign-in offers the picker again.
+    await (_googleReady ??= GoogleSignIn.instance.initialize());
+    await GoogleSignIn.instance.signOut();
+    await _auth.signOut();
+  }
 }
 
 /// Demo mode: the user id typed on the sign-in screen is the bearer token.

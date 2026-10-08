@@ -1,46 +1,8 @@
-import 'package:family_core/family_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:homebell/gate/gate_api.dart';
 import 'package:homebell/gate/gate_controller.dart';
 
-const me = Member(id: 'me', displayName: 'Ate', role: MemberRole.member);
-const papa = Member(id: 'papa', displayName: 'Papa', role: MemberRole.parent);
-
-GateAlert alert({
-  required Member sender,
-  GateAlertStatus status = GateAlertStatus.ringing,
-  Member? acknowledgedBy,
-}) =>
-    GateAlert(id: 'a1', status: status, sender: sender, acknowledgedBy: acknowledgedBy, ringCount: 1);
-
-/// In-memory stand-in for the server.
-class FakeGateApi implements GateApi {
-  GateAlert? activeAlert;
-  final ended = <String, GateAlert>{};
-  final acknowledged = <String>[];
-
-  @override
-  Future<GateAlert?> active() async => activeAlert;
-
-  @override
-  Future<GateAlert> ring() async => activeAlert ??= alert(sender: me);
-
-  @override
-  Future<GateAlert> get(String id) async => ended[id]!;
-
-  @override
-  Future<GateAlert> acknowledge(String id) async {
-    acknowledged.add(id);
-    activeAlert = null;
-    return alert(sender: papa, status: GateAlertStatus.acknowledged, acknowledgedBy: me);
-  }
-
-  @override
-  Future<GateAlert> cancel(String id) async {
-    activeAlert = null;
-    return alert(sender: me, status: GateAlertStatus.cancelled);
-  }
-}
+import 'fakes.dart';
 
 void main() {
   late FakeGateApi api;
