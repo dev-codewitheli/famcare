@@ -38,6 +38,10 @@ class ApiClient {
 
   Future<dynamic> put(String path, [Object? body]) => _send('PUT', path, body);
 
+  Future<dynamic> patch(String path, [Object? body]) => _send('PATCH', path, body);
+
+  Future<dynamic> delete(String path) => _send('DELETE', path);
+
   Future<dynamic> _send(String method, String path, [Object? body]) async {
     final request = http.Request(method, baseUrl.resolve(path));
     final token = await _token();

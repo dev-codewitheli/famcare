@@ -19,6 +19,18 @@ class DeviceSettings {
   static Future<int> alarmVolumePercent() async =>
       await _channel.invokeMethod<int>('alarmVolumePercent') ?? 100;
 
+  /// Whether the ring channel still has sound and pop-up on (null if it doesn't exist yet).
+  static Future<bool?> ringChannelOk(String channelId) =>
+      _channel.invokeMethod<bool>('ringChannelOk', {'channelId': channelId});
+
+  /// Xiaomi app-op codes for settings outside standard Android.
+  static const miuiAutostart = 10008;
+  static const miuiShowWhenLocked = 10020;
+  static const miuiBackgroundPopups = 10021;
+
+  /// Best effort on Xiaomi; null when it can't be read (other brands, or the OS hides it).
+  static Future<bool?> miuiOpAllowed(int op) => _channel.invokeMethod<bool>('miuiOpAllowed', {'op': op});
+
   /// Opens the system dialog; re-check [isIgnoringBatteryOptimizations] when the app resumes.
   static Future<void> requestIgnoreBatteryOptimizations() =>
       _channel.invokeMethod('requestIgnoreBatteryOptimizations');

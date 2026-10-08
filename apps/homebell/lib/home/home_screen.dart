@@ -45,6 +45,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (widget.usesPush) {
       // In the foreground, pushes come here instead of the background handler.
       _pushes = FirebaseMessaging.onMessage.listen((m) async {
+        if (m.data['type'] == 'MEMBER_REMOVED') {
+          // Back to the join screen; the session sees NOT_IN_FAMILY.
+          await widget.session.refresh();
+          return;
+        }
         await GateNotifications.handlePush(m.data);
         await Future.wait([_gate.refresh(), _activity.refresh()]);
       });
@@ -122,13 +127,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// screen. Opening the app must NOT stop the ring: like an incoming call, it keeps ringing
   /// while the screen shows "… is at the gate" until someone actually answers.
   Future<void> _handleResponse(NotificationResponse? response) async {
-    final alertId = response?.payload;
-    if (alertId == null || alertId == 'test') return;
-    if (response!.actionId == GateNotifications.comingActionId) {
-      await _answer(alertId);
+    final payload = response?.payload;
+    if (payload == null || payload == 'test') return;
+    final action = response!.actionId;
+
+    // "On my way" heads-up from someone else: "Got it".
+    if (payload.startsWith(GateNotifications.headsUpPayloadPrefix)) {
+      if (action == GateNotifications.gotItActionId) {
+        await _gotIt(payload.substring(GateNotifications.headsUpPayloadPrefix.length));
+      }
+      return _activity.refresh();
+    }
+    // My "time's up" reminder: ring now, or add time.
+    if (payload.startsWith(GateNotifications.duePayloadPrefix)) {
+      if (action == GateNotifications.ringNowActionId) {
+        await GateNotifications.cancelDueReminder();
+        await _ring();
+      } else if (action == GateNotifications.addTimeActionId) {
+        await GateNotifications.cancelDueReminder();
+        await _announce(GateNotifications.addTimeMinutes);
+      }
+      return _activity.refresh();
+    }
+    // A gate ring.
+    if (action == GateNotifications.comingActionId) {
+      await _answer(payload);
     } else {
       await _gate.refresh();
     }
+  }
+
+  Future<void> _gotIt(String noticeId) async {
+    final arrival = _activity.othersOnTheWay.where((a) => a.id == noticeId).firstOrNull;
+    final error = await _activity.markSeen(noticeId);
+    if (arrival != null) await GateNotifications.cancelHeadsUp(arrival.member.displayName);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error ?? '${arrival?.member.displayName ?? 'They'} will know you saw it'),
+    ));
   }
 
   /// "Coming!" The server tells everyone else to stop ringing; this phone stops its own ring.
@@ -139,16 +175,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _ring() async {
+    await GateNotifications.cancelDueReminder();
     await _gate.ring();
     await _activity.refresh();
   }
 
   Future<void> _announce(int minutes) async {
-    final error = await _activity.announce(minutes);
+    final result = await _activity.announce(minutes);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(error ?? 'Family notified: you\'re about $minutes min away'),
-    ));
+    final arrival = result.arrival;
+    if (arrival == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.error!)));
+      return;
+    }
+    await showDialog<void>(context: context, builder: (_) => HeadsUpSentDialog(arrival: arrival));
   }
 
   void _open(Widget screen) =>
@@ -225,14 +265,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   for (final arrival in _activity.othersOnTheWay) ...[
                     const SizedBox(height: 12),
-                    OnTheWayCard(arrival: arrival),
+                    OnTheWayCard(
+                      arrival: arrival,
+                      seenByMe: arrival.seenByMember(_myId),
+                      onGotIt: () => _gotIt(arrival.id),
+                    ),
                   ],
                   if (canAnnounce) ...[
                     const SizedBox(height: 20),
                     OnMyWayCard(
                       myArrival: _activity.myArrival,
-                      busy: _activity.announcing,
+                      busy: _activity.announcing || _gate.busy,
                       onAnnounce: _announce,
+                      onRingNow: _ring,
                     ),
                   ],
                   const SizedBox(height: 24),

@@ -40,19 +40,43 @@ class GateAlert {
 
 /// "On my way, about N minutes."
 class Arrival {
-  const Arrival({required this.id, required this.member, required this.etaMinutes, required this.expectedAt});
+  const Arrival({
+    required this.id,
+    required this.member,
+    required this.etaMinutes,
+    required this.expectedAt,
+    this.seenBy = const [],
+    this.notified = const [],
+  });
 
   factory Arrival.fromJson(Map<String, dynamic> json) => Arrival(
         id: json['id'] as String,
         member: Member.fromJson(json['member'] as Map<String, dynamic>),
         etaMinutes: json['etaMinutes'] as int,
         expectedAt: DateTime.parse(json['expectedAt'] as String).toLocal(),
+        seenBy: _members(json['seenBy']),
+        notified: _members(json['notified']),
       );
+
+  static List<Member> _members(Object? json) => [
+        for (final m in (json as List<dynamic>? ?? const [])) Member.fromJson(m as Map<String, dynamic>),
+      ];
 
   final String id;
   final Member member;
   final int etaMinutes;
   final DateTime expectedAt;
+
+  /// Who tapped "Got it".
+  final List<Member> seenBy;
+
+  /// Who the heads-up was sent to (only right after announcing).
+  final List<Member> notified;
+
+  /// The expected time has come: "are you at the gate?"
+  bool isDue(DateTime now) => !now.isBefore(expectedAt);
+
+  bool seenByMember(String memberId) => seenBy.any((m) => m.id == memberId);
 
   /// Whole minutes until the expected arrival; 0 once it's due.
   int minutesLeft(DateTime now) {
@@ -92,6 +116,10 @@ class GateApi {
 
   Future<Arrival> announceArrival(int etaMinutes) async =>
       Arrival.fromJson(await _api.post('/api/arrivals', {'etaMinutes': etaMinutes}));
+
+  /// "Got it": tells the person on their way that I saw their heads-up.
+  Future<Arrival> markArrivalSeen(String noticeId) async =>
+      Arrival.fromJson(await _api.post('/api/arrivals/$noticeId/seen'));
 
   /// Who's on their way, soonest first.
   Future<List<Arrival>> arrivals() async => [

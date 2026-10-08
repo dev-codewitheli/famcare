@@ -1,5 +1,7 @@
 package com.devcodewitheli.homebell
 
+import android.app.AppOpsManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
@@ -8,6 +10,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -26,6 +29,8 @@ class MainActivity : FlutterActivity() {
                     "isIgnoringBatteryOptimizations" -> result.success(isIgnoringBatteryOptimizations())
                     "manufacturer" -> result.success(Build.MANUFACTURER)
                     "alarmVolumePercent" -> result.success(alarmVolumePercent())
+                    "ringChannelOk" -> result.success(ringChannelOk(call.argument<String>("channelId")!!))
+                    "miuiOpAllowed" -> result.success(miuiOpAllowed(call.argument<Int>("op")!!))
                     "requestIgnoreBatteryOptimizations" -> {
                         // Shows the system "Let app always run in background?" dialog.
                         startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -68,6 +73,36 @@ class MainActivity : FlutterActivity() {
         val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM).coerceAtLeast(1)
         return audio.getStreamVolume(AudioManager.STREAM_ALARM) * 100 / max
+    }
+
+    /**
+     * The user can turn a channel's sound or pop-up off in system settings; this catches that.
+     * Null if the channel doesn't exist yet.
+     */
+    private fun ringChannelOk(channelId: String): Boolean? {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = manager.getNotificationChannel(channelId) ?: return null
+        return channel.importance >= NotificationManager.IMPORTANCE_HIGH &&
+            channel.sound != null &&
+            channel.lockscreenVisibility != Notification.VISIBILITY_SECRET
+    }
+
+    /**
+     * Xiaomi keeps Autostart (10008), "Show on Lock screen" (10020) and "Display pop-up windows
+     * while running in the background" (10021) as app-ops. checkOpNoThrow(int, int, String) is a
+     * hidden API, so this is best effort: null means "can't tell", and the setup screen falls back
+     * to asking the user.
+     */
+    private fun miuiOpAllowed(op: Int): Boolean? {
+        if (!Build.MANUFACTURER.equals("xiaomi", ignoreCase = true)) return null
+        return try {
+            val ops = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val check = AppOpsManager::class.java.getMethod(
+                "checkOpNoThrow", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)
+            check.invoke(ops, op, Process.myUid(), packageName) as Int == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun openAppDetails(): Boolean = tryStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,

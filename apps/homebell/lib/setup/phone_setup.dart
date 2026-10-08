@@ -49,17 +49,19 @@ class SetupStep {
   final String? actionLabel;
   final Future<void> Function()? action;
 
-  /// Verifiable steps check the phone directly. Steps without a check are confirmed by
-  /// the user ("I did this"), because Android doesn't expose those OEM settings.
-  final Future<bool> Function()? check;
+  /// Checks the phone directly. Returns null when the setting can't be read (OEM settings that
+  /// Android doesn't expose); the user then confirms it themselves ("I did this").
+  final Future<bool?> Function()? check;
 
   /// Recommended, but doesn't keep the "finish setup" badge on.
   final bool optional;
-
-  bool get isManual => check == null;
 }
 
-/// The steps for a brand, most important first. Pure data, so it's unit-testable.
+/// The steps for a brand, most important first.
+///
+/// Each step covers a different setting; brand battery screens that just mirror Android's
+/// "battery optimization" (Xiaomi's "No restrictions", Samsung's "Unrestricted", Transsion's
+/// "Don't restrict") are left out because step 3 already sets them.
 List<SetupStep> setupStepsFor(PhoneBrand brand) => [
       SetupStep(
         id: 'notifications',
@@ -102,23 +104,16 @@ List<SetupStep> setupStepsFor(PhoneBrand brand) => [
       SetupStep(
         id: 'ring_channel',
         icon: Icons.lock_clock_rounded,
-        title: 'Ring sound, pop-up and lock screen',
-        detail: 'In "Gate rings", make sure Sound, Pop-up / Floating and Lock screen are all on.',
+        title: 'Keep the ring loud and visible',
+        detail: 'In "Gate rings", keep Sound, Pop-up and Lock screen on.',
         actionLabel: 'Open',
         action: () => DeviceSettings.openChannelSettings(GateNotifications.ringChannelId),
+        check: () async => await DeviceSettings.ringChannelOk(GateNotifications.ringChannelId) ?? true,
       ),
       ..._brandSteps(brand),
     ];
 
 List<SetupStep> _brandSteps(PhoneBrand brand) {
-  const autostart = SetupStep(
-    id: 'autostart',
-    icon: Icons.restart_alt_rounded,
-    title: 'Turn on Autostart',
-    detail: 'Find HomeBell in the list and switch it on. Without it, a closed app can\'t wake up for a ring.',
-    actionLabel: 'Open Autostart',
-    action: DeviceSettings.openAutostartSettings,
-  );
   const lockInRecents = SetupStep(
     id: 'lock_recents',
     icon: Icons.lock_rounded,
@@ -127,19 +122,19 @@ List<SetupStep> _brandSteps(PhoneBrand brand) {
         'and memory cleaners leave it alone.',
     optional: true,
   );
-  SetupStep batteryNoRestrictions(String detail) => SetupStep(
-        id: 'oem_battery',
-        icon: Icons.battery_alert_rounded,
-        title: 'Remove background limits',
-        detail: detail,
-        actionLabel: 'Open app settings',
-        action: DeviceSettings.openAppSettings,
-      );
 
   return switch (brand) {
     PhoneBrand.xiaomi => [
-        autostart,
-        const SetupStep(
+        SetupStep(
+          id: 'autostart',
+          icon: Icons.restart_alt_rounded,
+          title: 'Turn on Autostart',
+          detail: 'Switch HomeBell on. Without it, a closed app can\'t wake up for a ring.',
+          actionLabel: 'Open Autostart',
+          action: DeviceSettings.openAutostartSettings,
+          check: () => DeviceSettings.miuiOpAllowed(DeviceSettings.miuiAutostart),
+        ),
+        SetupStep(
           id: 'xiaomi_lock_screen',
           icon: Icons.screen_lock_portrait_rounded,
           title: 'Allow showing on the lock screen',
@@ -147,20 +142,37 @@ List<SetupStep> _brandSteps(PhoneBrand brand) {
               '"Display pop-up windows while running in the background".',
           actionLabel: 'Open permissions',
           action: DeviceSettings.openOemPermissions,
+          check: () async {
+            final locked = await DeviceSettings.miuiOpAllowed(DeviceSettings.miuiShowWhenLocked);
+            final popups = await DeviceSettings.miuiOpAllowed(DeviceSettings.miuiBackgroundPopups);
+            return locked == null || popups == null ? null : locked && popups;
+          },
         ),
-        batteryNoRestrictions('Battery saver → "No restrictions".'),
         lockInRecents,
       ],
+    // ColorOS keeps both switches on the same "Battery usage" page, so they're one step.
     PhoneBrand.oppo || PhoneBrand.realme => [
-        autostart,
-        batteryNoRestrictions('Battery → allow "Background activity" (or "Allow background running"), '
-            'and turn off "Optimize battery use" for HomeBell.'),
+        const SetupStep(
+          id: 'oem_background',
+          icon: Icons.battery_alert_rounded,
+          title: 'Allow background activity and auto launch',
+          detail: 'App info → Battery usage: turn on "Allow background activity" and "Allow auto launch".',
+          actionLabel: 'Open app info',
+          action: DeviceSettings.openAppSettings,
+        ),
         lockInRecents,
       ],
     PhoneBrand.vivo => [
-        autostart,
         const SetupStep(
-          id: 'oem_battery',
+          id: 'autostart',
+          icon: Icons.restart_alt_rounded,
+          title: 'Turn on Autostart',
+          detail: 'Switch HomeBell on. Without it, a closed app can\'t wake up for a ring.',
+          actionLabel: 'Open Autostart',
+          action: DeviceSettings.openAutostartSettings,
+        ),
+        const SetupStep(
+          id: 'oem_background',
           icon: Icons.battery_alert_rounded,
           title: 'Allow high background power use',
           detail: 'Battery → Background power consumption → allow HomeBell.',
@@ -169,39 +181,37 @@ List<SetupStep> _brandSteps(PhoneBrand brand) {
         ),
         lockInRecents,
       ],
-    PhoneBrand.samsung => [
+    PhoneBrand.transsion => [
         const SetupStep(
-          id: 'oem_battery',
-          icon: Icons.battery_alert_rounded,
-          title: 'Add to "Never sleeping apps"',
-          detail: 'Battery → Background usage limits → Never sleeping apps → add HomeBell. '
-              'Also set HomeBell\'s app battery to "Unrestricted".',
-          actionLabel: 'Open battery',
-          action: DeviceSettings.openOemBatterySettings,
+          id: 'autostart',
+          icon: Icons.restart_alt_rounded,
+          title: 'Turn on Auto-start',
+          detail: 'In Phone Master, allow HomeBell to auto-start and exclude it from cleaning.',
+          actionLabel: 'Open Auto-start',
+          action: DeviceSettings.openAutostartSettings,
         ),
         lockInRecents,
       ],
-    PhoneBrand.transsion => [
-        autostart,
-        batteryNoRestrictions('Battery → "Don\'t restrict" (or "No restrictions"). In Phone Master, '
-            'exclude HomeBell from cleaning.'),
-        lockInRecents,
-      ],
-    PhoneBrand.other => [
-        batteryNoRestrictions('Battery → "Unrestricted" (or "Allow background activity").'),
-      ],
+    // Samsung and stock Android: step 3 ("Unrestricted" battery) covers background running.
+    PhoneBrand.samsung => const [lockInRecents],
+    PhoneBrand.other => const [],
   };
 }
 
 /// The result of checking every step on this phone.
 class PhoneSetupStatus {
-  PhoneSetupStatus(this.brand, this.steps, this.done);
+  PhoneSetupStatus(this.brand, this.steps, this.done, this.manual);
 
   final PhoneBrand brand;
   final List<SetupStep> steps;
   final Map<String, bool> done;
 
+  /// Steps the phone can't verify, so the user confirms them.
+  final Set<String> manual;
+
   bool isDone(SetupStep step) => done[step.id] ?? false;
+
+  bool isManual(SetupStep step) => manual.contains(step.id);
 
   /// Required steps still to do; drives the "finish setup" badge.
   int get remaining => steps.where((s) => !s.optional && !isDone(s)).length;
@@ -215,10 +225,17 @@ class PhoneSetupStatus {
     final steps = setupStepsFor(brand);
     final prefs = await SharedPreferences.getInstance();
     final done = <String, bool>{};
+    final manual = <String>{};
     for (final step in steps) {
-      done[step.id] = step.check != null ? await step.check!() : prefs.getBool('$_manualPrefix${step.id}') ?? false;
+      final checked = await step.check?.call();
+      if (checked != null) {
+        done[step.id] = checked;
+      } else {
+        manual.add(step.id);
+        done[step.id] = prefs.getBool('$_manualPrefix${step.id}') ?? false;
+      }
     }
-    return PhoneSetupStatus(brand, steps, done);
+    return PhoneSetupStatus(brand, steps, done, manual);
   }
 
   /// For steps Android can't verify: the user confirms they changed the setting.

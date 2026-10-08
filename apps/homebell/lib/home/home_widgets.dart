@@ -330,9 +330,11 @@ class OutcomeCard extends StatelessWidget {
 
 /// Someone else told the family they're on their way.
 class OnTheWayCard extends StatelessWidget {
-  const OnTheWayCard({super.key, required this.arrival});
+  const OnTheWayCard({super.key, required this.arrival, required this.seenByMe, required this.onGotIt});
 
   final Arrival arrival;
+  final bool seenByMe;
+  final VoidCallback onGotIt;
 
   @override
   Widget build(BuildContext context) {
@@ -340,33 +342,65 @@ class OnTheWayCard extends StatelessWidget {
     final minutes = arrival.minutesLeft(DateTime.now());
     return Card(
       color: theme.colorScheme.secondaryContainer,
-      child: ListTile(
-        leading: MemberAvatar(name: arrival.member.displayName),
-        title: Text('${arrival.member.displayName} is on the way',
-            style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(minutes == 0
-            ? 'Should be at the gate any moment'
-            : 'About $minutes min away, around ${formatClock(context, arrival.expectedAt)}'),
-        trailing: const Icon(Icons.directions_car_rounded),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          children: [
+            MemberAvatar(name: arrival.member.displayName),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${arrival.member.displayName} is on the way',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(minutes == 0
+                      ? 'Should be at the gate any moment'
+                      : 'About $minutes min away, around ${formatClock(context, arrival.expectedAt)}'),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            seenByMe
+                ? Chip(avatar: const Icon(Icons.check_rounded, size: 18), label: const Text('Seen'))
+                : FilledButton.tonalIcon(
+                    onPressed: onGotIt,
+                    icon: const Icon(Icons.thumb_up_alt_rounded, size: 18),
+                    label: const Text('Got it'),
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                  ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// "Not home yet?" Tell the family roughly when you'll arrive.
+/// "Not home yet?" Tell the family roughly when you'll arrive; when the time is up, ring or
+/// add time if you're delayed.
 class OnMyWayCard extends StatelessWidget {
-  const OnMyWayCard({super.key, required this.myArrival, required this.busy, required this.onAnnounce});
+  const OnMyWayCard({
+    super.key,
+    required this.myArrival,
+    required this.busy,
+    required this.onAnnounce,
+    required this.onRingNow,
+  });
 
   final Arrival? myArrival;
   final bool busy;
   final ValueChanged<int> onAnnounce;
+  final VoidCallback onRingNow;
 
   static const _options = [5, 10, 15, 30];
+  static const _delayOptions = [5, 10];
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final mine = myArrival;
+    if (mine != null && mine.isDue(DateTime.now())) return _timesUp(context, mine);
+
+    final theme = Theme.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -383,11 +417,16 @@ class OnMyWayCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               mine == null
-                  ? 'Give the family a heads-up so someone can head to the gate before you arrive.'
+                  ? 'Give the family a heads-up so someone can head to the gate before you arrive. '
+                      'We\'ll remind you when the time is up.'
                   : 'You told the family you\'d arrive around ${formatClock(context, mine.expectedAt)}. '
-                      'Tap to update.',
+                      'Tap a time to update it.',
               style: theme.textTheme.bodyMedium,
             ),
+            if (mine != null) ...[
+              const SizedBox(height: 8),
+              _SeenBy(arrival: mine),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -406,6 +445,113 @@ class OnMyWayCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _timesUp(BuildContext context, Arrival mine) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Card(
+      color: colors.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.alarm_rounded, color: colors.onTertiaryContainer),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('Time\'s up. Are you at the gate?',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text('You said you\'d arrive around ${formatClock(context, mine.expectedAt)}. '
+                'Running late? Add time and the family will be updated.'),
+            const SizedBox(height: 8),
+            _SeenBy(arrival: mine),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: busy ? null : onRingNow,
+                    icon: const Icon(Icons.notifications_active_rounded),
+                    label: const Text('I\'m at the gate'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final minutes in _delayOptions)
+                  ActionChip(
+                    avatar: const Icon(Icons.more_time_rounded, size: 18),
+                    label: Text('+$minutes min'),
+                    onPressed: busy ? null : () => onAnnounce(minutes),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Seen by Papa, Mama" or "Not seen yet".
+class _SeenBy extends StatelessWidget {
+  const _SeenBy({required this.arrival});
+
+  final Arrival arrival;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final seen = arrival.seenBy;
+    return Row(
+      children: [
+        Icon(seen.isEmpty ? Icons.schedule_send_rounded : Icons.done_all_rounded,
+            size: 18, color: seen.isEmpty ? theme.colorScheme.outline : Colors.green.shade600),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            seen.isEmpty ? 'Sent, not seen yet' : 'Seen by ${seen.map((m) => m.displayName).join(', ')}',
+            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shown right after "On my way": who was told, and when the reminder will come.
+class HeadsUpSentDialog extends StatelessWidget {
+  const HeadsUpSentDialog({super.key, required this.arrival});
+
+  final Arrival arrival;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = arrival.notified.map((m) => m.displayName).toList();
+    final time = formatClock(context, arrival.expectedAt);
+    return AlertDialog(
+      icon: Icon(Icons.mark_email_read_rounded, color: Colors.green.shade600, size: 36),
+      title: const Text('Heads-up sent'),
+      content: Text(names.isEmpty
+          ? 'Nobody else is in your family yet. Share the invite code so they get your heads-ups.'
+          : '${_joinNames(names)} ${names.length == 1 ? 'was' : 'were'} told you\'re about '
+              '${arrival.etaMinutes} min away.\n\nWe\'ll remind you around $time to tap '
+              '"I\'m at the gate", and you\'ll be notified when someone sees it.'),
+      actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+    );
+  }
+
+  static String _joinNames(List<String> names) =>
+      names.length <= 1 ? names.join() : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
 }
 
 class RecentActivity extends StatelessWidget {

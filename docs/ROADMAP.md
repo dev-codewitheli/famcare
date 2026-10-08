@@ -21,7 +21,13 @@
 - [x] Redesigned sign-in, onboarding, home, settings
 - [x] Brand-specific phone setup: Xiaomi, OPPO/OnePlus, realme, vivo, Samsung, Infinix/Tecno
 
-## v0.3: FamCare (vitamin tracker)
+## v0.3: HomeBell family features (done)
+- [x] "Time's up" reminder to the sender with "I'm at the gate" / "+5 min"
+- [x] "Heads-up sent" confirmation, "Got it" acknowledgements and "Seen by"
+- [x] Edit nickname; family creator renames the family and removes members
+- [x] Recent activity capped at 5; phone setup without duplicate steps, Xiaomi checks automatic
+
+## v0.4: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day
 - [ ] Daily checklist that resets at midnight (Asia/Manila); tick to mark as taken
 - [ ] Server-side "remind only if not taken yet" push at each scheduled time
@@ -29,7 +35,7 @@
 - [ ] History and streaks
 - [ ] Low-stock reminder ("Fish oil: about 5 days left")
 
-## v0.4: one-tap extras
+## v0.5: one-tap extras
 - [ ] NFC sticker at the gate: tap your phone on it to ring
 - [ ] Quick Settings tile: "Gate" in the notification shade (Kotlin `TileService`)
 - [ ] Home-screen widgets: gate button, today's vitamins

@@ -23,8 +23,12 @@ GateAlert alert({
       resolvedAt: resolvedAt,
     );
 
-Arrival arrival(Member member, int minutes) =>
-    Arrival(id: 'n-${member.id}', member: member, etaMinutes: minutes, expectedAt: t0.add(Duration(minutes: minutes)));
+Arrival arrival(Member member, int minutes, {List<Member> notified = const []}) => Arrival(
+    id: 'n-${member.id}',
+    member: member,
+    etaMinutes: minutes,
+    expectedAt: t0.add(Duration(minutes: minutes)),
+    notified: notified);
 
 /// In-memory stand-in for the server.
 class FakeGateApi implements GateApi {
@@ -66,8 +70,18 @@ class FakeGateApi implements GateApi {
   @override
   Future<Arrival> announceArrival(int etaMinutes) async {
     if (failWith != null) throw failWith!;
-    final mine = arrival(me, etaMinutes);
-    activeArrivals = [...activeArrivals.where((a) => a.member.id != me.id), mine];
-    return mine;
+    final sent = arrival(me, etaMinutes, notified: const [papa]);
+    activeArrivals = [...activeArrivals.where((a) => a.member.id != me.id), sent];
+    return sent;
+  }
+
+  @override
+  Future<Arrival> markArrivalSeen(String noticeId) async {
+    if (failWith != null) throw failWith!;
+    final a = activeArrivals.firstWhere((a) => a.id == noticeId);
+    final seen = Arrival(
+        id: a.id, member: a.member, etaMinutes: a.etaMinutes, expectedAt: a.expectedAt, seenBy: [...a.seenBy, me]);
+    activeArrivals = [for (final x in activeArrivals) x.id == noticeId ? seen : x];
+    return seen;
   }
 }

@@ -57,6 +57,23 @@ class Session extends ChangeNotifier {
   Future<void> joinFamily({required String inviteCode, required String displayName}) async =>
       _ready(await familyApi.join(inviteCode: inviteCode, displayName: displayName));
 
+  /// Change what the family calls me.
+  Future<void> renameMe(String displayName) async => _update(await familyApi.renameMe(displayName));
+
+  /// Family creator only; the server answers 403 for anyone else.
+  Future<void> renameFamily(String familyName) async => _update(await familyApi.renameFamily(familyName));
+
+  /// Family creator only.
+  Future<void> removeMember(String memberId) async => _update(await familyApi.removeMember(memberId));
+
+  /// Whether I'm the one who set up the family (and may rename it or remove members).
+  bool get isCreator => _family?.me.role == MemberRole.parent;
+
+  void _update(Family family) {
+    _family = family;
+    notifyListeners();
+  }
+
   Future<void> signOut() async {
     await auth.signOut();
     await (await SharedPreferences.getInstance()).remove(_memberIdKey);

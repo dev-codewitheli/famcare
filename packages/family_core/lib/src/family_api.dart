@@ -22,4 +22,13 @@ class FamilyApi {
       }));
 
   Future<void> registerDevice(String pushToken) => _api.put('/api/devices', {'pushToken': pushToken});
+
+  Future<Family> renameMe(String displayName) async =>
+      Family.fromJson(await _api.patch('/api/families/mine/me', {'displayName': displayName}));
+
+  Future<Family> renameFamily(String familyName) async =>
+      Family.fromJson(await _api.patch('/api/families/mine', {'familyName': familyName}));
+
+  Future<Family> removeMember(String memberId) async =>
+      Family.fromJson(await _api.delete('/api/families/mine/members/$memberId'));
 }

@@ -110,7 +110,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                       step: step,
                       done: status.isDone(step),
                       onAction: () => _run(step),
-                      onMarkDone: step.isManual ? (done) => _markDone(step, done) : null,
+                      onMarkDone: status.isManual(step) ? (done) => _markDone(step, done) : null,
                     ),
                   ),
                 const SizedBox(height: 8),
@@ -219,7 +219,7 @@ class _StepCard extends StatelessWidget {
               Row(
                 children: [
                   const SizedBox(width: 48),
-                  if (step.action != null && !(done && !step.isManual))
+                  if (step.action != null && !(done && onMarkDone == null))
                     FilledButton.tonal(onPressed: onAction, child: Text(step.actionLabel ?? 'Open')),
                   const Spacer(),
                   if (onMarkDone != null)

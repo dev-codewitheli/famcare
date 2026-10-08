@@ -13,6 +13,16 @@ class GateNotifications {
   static final _plugin = FlutterLocalNotificationsPlugin();
 
   static const comingActionId = 'coming';
+  static const gotItActionId = 'got_it';
+  static const ringNowActionId = 'ring_now';
+  static const addTimeActionId = 'add_time';
+
+  /// How much "+ time" the reminder's button adds.
+  static const addTimeMinutes = 5;
+
+  /// Notification payloads: a gate ring carries just its alert id; heads-ups carry a prefix.
+  static const headsUpPayloadPrefix = 'arrival:';
+  static const duePayloadPrefix = 'arrival-due:';
 
   /// Notification taps and "Coming!" presses while the app is running; HomeScreen consumes them.
   static final responses = ValueNotifier<NotificationResponse?>(null);
@@ -99,7 +109,17 @@ class GateNotifications {
   /// Handles a data push from the server (see PushMessage on the server side).
   static Future<void> handlePush(Map<String, dynamic> data) async {
     final type = data['type'];
-    if (type == 'ARRIVAL_HEADS_UP') return _showArrival(data);
+    switch (type) {
+      case 'ARRIVAL_HEADS_UP':
+        return _showArrival(data);
+      case 'ARRIVAL_SEEN':
+        return _showSeen(data);
+      case 'ARRIVAL_DUE':
+        return _showDue(data);
+      case 'MEMBER_REMOVED':
+        return _showUpdate('removed', 'You were removed from the family',
+            'You won\'t get gate rings anymore. Ask for the invite code to join again.');
+    }
 
     final alertId = data['alertId'] as String?;
     if (alertId == null) return;
@@ -161,15 +181,64 @@ class GateNotifications {
     final minutes = data['etaMinutes'] as String? ?? '?';
     return _plugin.show(
       // One heads-up per person: a newer ETA replaces the older notification.
-      id: _id('arrival:$name'),
+      id: _id('$headsUpPayloadPrefix$name'),
       title: '$name is on the way',
       body: 'About $minutes min away. Get ready to open the gate.',
+      payload: '$headsUpPayloadPrefix${data['noticeId']}',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _arrivalsChannelId,
+          'On my way',
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.status,
+          actions: [AndroidNotificationAction(gotItActionId, 'Got it', showsUserInterface: true)],
+        ),
+      ),
+    );
+  }
+
+  /// To the person on their way: someone tapped "Got it".
+  static Future<void> _showSeen(Map<String, dynamic> data) {
+    final name = data['seenByName'] as String? ?? 'Someone';
+    return _plugin.show(
+      id: _id('seen:${data['noticeId']}:$name'),
+      title: '$name saw your heads-up',
+      body: 'They know you\'re on your way.',
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(_arrivalsChannelId, 'On my way',
             importance: Importance.high, priority: Priority.high, category: AndroidNotificationCategory.status),
       ),
     );
   }
+
+  /// To the person on their way, at the time they gave: ring now, or add time if delayed.
+  static Future<void> _showDue(Map<String, dynamic> data) {
+    return _plugin.show(
+      id: _id('due'),
+      title: 'Time\'s up. Are you at the gate?',
+      body: 'Ring the family now, or add $addTimeMinutes minutes if you\'re running late.',
+      payload: '$duePayloadPrefix${data['noticeId']}',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _arrivalsChannelId,
+          'On my way',
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.reminder,
+          actions: [
+            AndroidNotificationAction(ringNowActionId, 'I\'m at the gate', showsUserInterface: true),
+            AndroidNotificationAction(addTimeActionId, '+$addTimeMinutes min', showsUserInterface: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Future<void> cancelDueReminder() => _plugin.cancel(id: _id('due'));
+
+  /// Clears a heads-up notification after "Got it", whichever person it was from.
+  static Future<void> cancelHeadsUp(String senderName) => _plugin.cancel(id: _id('$headsUpPayloadPrefix$senderName'));
 
   static Future<void> _showUpdate(String alertId, String title, String body) {
     return _plugin.show(
