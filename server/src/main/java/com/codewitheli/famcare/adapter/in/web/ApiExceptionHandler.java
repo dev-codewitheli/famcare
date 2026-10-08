@@ -22,6 +22,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "NOT_IN_FAMILY", e.getMessage());
     }
 
+    /** Invalid values a domain object refuses, e.g. an out-of-range ETA. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail badRequest(IllegalArgumentException e) {
+        return problem(HttpStatus.BAD_REQUEST, "BAD_REQUEST", e.getMessage());
+    }
+
     /** Domain rule violations, e.g. acknowledging an alert that was already answered. */
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail conflict(IllegalStateException e) {

@@ -16,4 +16,6 @@ public record PushMessage(String type, Map<String, String> data, Duration timeTo
     public static final String GATE_ACKNOWLEDGED = "GATE_ACKNOWLEDGED";
     public static final String GATE_CANCELLED = "GATE_CANCELLED";
     public static final String GATE_EXPIRED = "GATE_EXPIRED";
+    /** "On my way, about N minutes": a normal notification, not an alarm. */
+    public static final String ARRIVAL_HEADS_UP = "ARRIVAL_HEADS_UP";
 }

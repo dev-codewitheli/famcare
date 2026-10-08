@@ -3,6 +3,7 @@ package com.codewitheli.famcare.application.port.in;
 import com.codewitheli.famcare.application.AuthenticatedUser;
 import com.codewitheli.famcare.application.GateAlertView;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,9 @@ public interface GateAlertUseCase {
 
     /** Lets the sender see how their alert ended (who's coming, or that nobody answered). */
     GateAlertView get(AuthenticatedUser user, UUID alertId);
+
+    /** The family's latest gate alerts, newest first, for the activity list. */
+    List<GateAlertView> recent(AuthenticatedUser user, int limit);
 
     /** Re-rings unanswered alerts and expires the ones that rang too many times. Runs on a schedule. */
     void processRingingAlerts();

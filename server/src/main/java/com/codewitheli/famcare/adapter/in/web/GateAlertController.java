@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -36,6 +38,13 @@ class GateAlertController {
                 .map(GateAlertResponse::from)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** Newest first, for the activity list. */
+    @GetMapping("/recent")
+    List<GateAlertResponse> recent(@AuthenticationPrincipal AuthenticatedUser user,
+                                   @RequestParam(defaultValue = "10") int limit) {
+        return gateAlerts.recent(user, limit).stream().map(GateAlertResponse::from).toList();
     }
 
     @GetMapping("/{id}")

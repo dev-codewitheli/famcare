@@ -3,6 +3,7 @@ package com.codewitheli.famcare.adapter.out.persistence;
 import com.codewitheli.famcare.application.port.out.GateAlertRepository;
 import com.codewitheli.famcare.domain.model.GateAlert;
 import com.codewitheli.famcare.domain.model.GateAlertStatus;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,8 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
                                                                                    GateAlertStatus status);
 
         List<GateAlertEntity> findByStatus(GateAlertStatus status);
+
+        List<GateAlertEntity> findByFamilyIdOrderByCreatedAtDesc(UUID familyId, Limit limit);
     }
 
     private final Jpa jpa;
@@ -45,5 +48,12 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
     @Override
     public List<GateAlert> findAllRinging() {
         return jpa.findByStatus(GateAlertStatus.RINGING).stream().map(GateAlertEntity::toDomain).toList();
+    }
+
+    @Override
+    public List<GateAlert> findRecentByFamily(UUID familyId, int limit) {
+        return jpa.findByFamilyIdOrderByCreatedAtDesc(familyId, Limit.of(limit)).stream()
+                .map(GateAlertEntity::toDomain)
+                .toList();
     }
 }

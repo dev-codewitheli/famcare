@@ -170,6 +170,65 @@ class GateAlertFlowTest {
                 .header("Authorization", "Bearer neighbor")).hasStatus(404);
     }
 
+    @Test
+    void onMyWayHeadsUpNotifiesOthersAndClearsWhenTheyRing() {
+        assertThat(mvc.post().uri("/api/arrivals").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"etaMinutes\": 10}"))
+                .hasStatus(201);
+
+        var headsUp = pushes.last();
+        assertThat(headsUp.message().type()).isEqualTo(PushMessage.ARRIVAL_HEADS_UP);
+        assertThat(headsUp.message().data()).containsEntry("senderName", "Ate").containsEntry("etaMinutes", "10");
+        assertThat(headsUp.tokens()).containsExactlyInAnyOrder("token-papa", "token-mama");
+
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer papa"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$[*].member.displayName").asArray().containsExactly("Ate");
+
+        ring("ate");
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer papa"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$").asArray().isEmpty();
+    }
+
+    @Test
+    void onMyWayExpiresTenMinutesAfterTheExpectedArrival() {
+        mvc.post().uri("/api/arrivals").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"etaMinutes\": 5}").exchange();
+
+        clock.advance(Duration.ofMinutes(14));
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer papa"))
+                .bodyJson().extractingPath("$").asArray().hasSize(1);
+
+        clock.advance(Duration.ofMinutes(2));
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer papa"))
+                .bodyJson().extractingPath("$").asArray().isEmpty();
+    }
+
+    @Test
+    void onMyWayRejectsUnrealisticEtas() {
+        assertThat(mvc.post().uri("/api/arrivals").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"etaMinutes\": 0}"))
+                .hasStatus(400);
+        assertThat(mvc.post().uri("/api/arrivals").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"etaMinutes\": 61}"))
+                .hasStatus(400);
+    }
+
+    @Test
+    void recentActivityListsTheFamilysAlertsNewestFirst() {
+        var first = ring("ate");
+        mvc.post().uri("/api/gate-alerts/{id}/acknowledge", first).header("Authorization", "Bearer papa").exchange();
+        clock.advance(Duration.ofMinutes(1));
+        var second = ring("mama");
+
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer papa"))
+                .hasStatusOk()
+                .bodyJson()
+                .satisfies(json -> assertThat(json).extractingPath("$[*].id").asArray().containsExactly(second, first))
+                .extractingPath("$[1].acknowledgedBy.displayName").isEqualTo("Papa");
+    }
+
     private String ring(String user) {
         var result = mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer " + user).exchange();
         assertThat(result).hasStatusOk();

@@ -14,4 +14,7 @@ public interface GateAlertRepository {
     Optional<GateAlert> findRingingByFamily(UUID familyId);
 
     List<GateAlert> findAllRinging();
+
+    /** Newest first. */
+    List<GateAlert> findRecentByFamily(UUID familyId, int limit);
 }
