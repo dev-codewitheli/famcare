@@ -5,6 +5,7 @@ import com.codewitheli.famcare.domain.model.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,9 +14,9 @@ import java.util.UUID;
 class MemberPersistenceAdapter implements MemberRepository {
 
     interface Jpa extends JpaRepository<MemberEntity, UUID> {
-        Optional<MemberEntity> findByAuthUid(String authUid);
+        Optional<MemberEntity> findByAuthUidAndRemovedAtIsNull(String authUid);
 
-        List<MemberEntity> findByFamilyIdOrderByJoinedAt(UUID familyId);
+        List<MemberEntity> findByFamilyIdAndRemovedAtIsNullOrderByJoinedAt(UUID familyId);
     }
 
     private final Jpa jpa;
@@ -36,11 +37,21 @@ class MemberPersistenceAdapter implements MemberRepository {
 
     @Override
     public Optional<Member> findByAuthUid(String authUid) {
-        return jpa.findByAuthUid(authUid).map(MemberEntity::toDomain);
+        return jpa.findByAuthUidAndRemovedAtIsNull(authUid).map(MemberEntity::toDomain);
     }
 
     @Override
     public List<Member> findByFamilyId(UUID familyId) {
-        return jpa.findByFamilyIdOrderByJoinedAt(familyId).stream().map(MemberEntity::toDomain).toList();
+        return jpa.findByFamilyIdAndRemovedAtIsNullOrderByJoinedAt(familyId).stream()
+                .map(MemberEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void markRemoved(UUID memberId, Instant now) {
+        jpa.findById(memberId).ifPresent(entity -> {
+            entity.markRemoved(now);
+            jpa.save(entity);
+        });
     }
 }

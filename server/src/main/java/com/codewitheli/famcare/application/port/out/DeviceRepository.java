@@ -11,4 +11,6 @@ public interface DeviceRepository {
     List<String> tokensFor(Collection<UUID> memberIds);
 
     void deleteTokens(Collection<String> pushTokens);
+
+    void deleteByMember(UUID memberId);
 }

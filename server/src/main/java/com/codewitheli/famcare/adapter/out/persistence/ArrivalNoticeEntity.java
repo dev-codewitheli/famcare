@@ -18,6 +18,7 @@ class ArrivalNoticeEntity {
     private UUID memberId;
     private int etaMinutes;
     private Instant createdAt;
+    private Instant dueNotifiedAt;
 
     protected ArrivalNoticeEntity() {
     }
@@ -29,10 +30,11 @@ class ArrivalNoticeEntity {
         entity.memberId = notice.memberId();
         entity.etaMinutes = notice.etaMinutes();
         entity.createdAt = notice.createdAt();
+        entity.dueNotifiedAt = notice.dueNotifiedAt();
         return entity;
     }
 
     ArrivalNotice toDomain() {
-        return new ArrivalNotice(id, familyId, memberId, etaMinutes, createdAt);
+        return new ArrivalNotice(id, familyId, memberId, etaMinutes, createdAt, dueNotifiedAt);
     }
 }

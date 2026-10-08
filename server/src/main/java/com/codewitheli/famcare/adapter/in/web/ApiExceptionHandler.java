@@ -1,5 +1,6 @@
 package com.codewitheli.famcare.adapter.in.web;
 
+import com.codewitheli.famcare.application.ForbiddenException;
 import com.codewitheli.famcare.application.NotFoundException;
 import com.codewitheli.famcare.application.NotInFamilyException;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     ProblemDetail notFound(NotFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", e.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ProblemDetail forbidden(ForbiddenException e) {
+        return problem(HttpStatus.FORBIDDEN, "FORBIDDEN", e.getMessage());
     }
 
     @ExceptionHandler(NotInFamilyException.class)

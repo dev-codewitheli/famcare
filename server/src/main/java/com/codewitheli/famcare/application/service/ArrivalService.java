@@ -2,6 +2,7 @@ package com.codewitheli.famcare.application.service;
 
 import com.codewitheli.famcare.application.ArrivalView;
 import com.codewitheli.famcare.application.AuthenticatedUser;
+import com.codewitheli.famcare.application.NotFoundException;
 import com.codewitheli.famcare.application.port.in.ArrivalUseCase;
 import com.codewitheli.famcare.application.port.out.ArrivalNoticeRepository;
 import com.codewitheli.famcare.application.port.out.MemberRepository;
@@ -15,6 +16,8 @@ import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -46,7 +49,10 @@ public class ArrivalService implements ArrivalUseCase {
                 "noticeId", notice.id().toString(),
                 "senderName", me.displayName(),
                 "etaMinutes", String.valueOf(etaMinutes)));
-        return new ArrivalView(notice, me);
+        var notified = members.findByFamilyId(me.familyId()).stream()
+                .filter(m -> !m.id().equals(me.id()))
+                .toList();
+        return new ArrivalView(notice, me, List.of(), notified);
     }
 
     @Override
@@ -54,12 +60,57 @@ public class ArrivalService implements ArrivalUseCase {
     public List<ArrivalView> active(AuthenticatedUser user) {
         var me = memberLookup.require(user);
         var now = clock.instant();
-        Map<java.util.UUID, Member> family = members.findByFamilyId(me.familyId()).stream()
-                .collect(Collectors.toMap(Member::id, Function.identity()));
-        return notices.findByFamilyCreatedSince(me.familyId(), ArrivalNotice.oldestActiveCreatedAt(now)).stream()
+        var family = familyById(me.familyId());
+        var active = notices.findByFamilyCreatedSince(me.familyId(), ArrivalNotice.oldestActiveCreatedAt(now)).stream()
                 .filter(n -> n.isActive(now))
                 .sorted(Comparator.comparing(ArrivalNotice::expectedAt))
-                .map(n -> new ArrivalView(n, family.get(n.memberId())))
                 .toList();
+        var seen = notices.seenBy(active.stream().map(ArrivalNotice::id).toList());
+        return active.stream()
+                .map(n -> new ArrivalView(n, family.get(n.memberId()), names(seen.get(n.id()), family), List.of()))
+                .toList();
+    }
+
+    @Override
+    public ArrivalView markSeen(AuthenticatedUser user, UUID noticeId) {
+        var me = memberLookup.require(user);
+        var notice = notices.findById(noticeId)
+                .filter(n -> n.familyId().equals(me.familyId()) && n.isActive(clock.instant()))
+                .orElseThrow(() -> new NotFoundException("That heads-up has ended"));
+        var family = familyById(me.familyId());
+        if (!notice.memberId().equals(me.id())) {
+            var alreadySeen = notices.seenBy(List.of(noticeId)).getOrDefault(noticeId, List.of()).contains(me.id());
+            notices.markSeen(noticeId, me.id(), clock.instant());
+            if (!alreadySeen) {
+                notifier.notifyMember(notice.familyId(), notice.memberId(), PushMessage.ARRIVAL_SEEN, Map.of(
+                        "noticeId", noticeId.toString(),
+                        "seenByName", me.displayName()));
+            }
+        }
+        var seen = notices.seenBy(List.of(noticeId)).get(noticeId);
+        return new ArrivalView(notice, family.get(notice.memberId()), names(seen, family), List.of());
+    }
+
+    @Override
+    public void sendDueReminders() {
+        var now = clock.instant();
+        for (var notice : notices.findUnremindedCreatedSince(ArrivalNotice.oldestActiveCreatedAt(now))) {
+            if (!notice.needsDueReminder(now)) {
+                continue;
+            }
+            notices.save(notice.dueNotified(now));
+            notifier.notifyMember(notice.familyId(), notice.memberId(), PushMessage.ARRIVAL_DUE, Map.of(
+                    "noticeId", notice.id().toString(),
+                    "etaMinutes", String.valueOf(notice.etaMinutes())));
+        }
+    }
+
+    private Map<UUID, Member> familyById(UUID familyId) {
+        return members.findByFamilyId(familyId).stream().collect(Collectors.toMap(Member::id, Function.identity()));
+    }
+
+    /** Members who've since left the family drop out of the "seen by" list. */
+    private static List<Member> names(List<UUID> memberIds, Map<UUID, Member> family) {
+        return memberIds == null ? List.of() : memberIds.stream().map(family::get).filter(Objects::nonNull).toList();
     }
 }

@@ -34,6 +34,10 @@ class FamilyNotifier {
         notify(me.familyId(), m -> !m.id().equals(me.id()), type, data, DEFAULT_TTL);
     }
 
+    void notifyMember(UUID familyId, UUID memberId, String type, Map<String, String> data) {
+        notify(familyId, m -> m.id().equals(memberId), type, data, DEFAULT_TTL);
+    }
+
     void notify(UUID familyId, Predicate<Member> recipients, String type, Map<String, String> data,
                 Duration timeToLive) {
         var memberIds = members.findByFamilyId(familyId).stream()

@@ -18,4 +18,10 @@ public record PushMessage(String type, Map<String, String> data, Duration timeTo
     public static final String GATE_EXPIRED = "GATE_EXPIRED";
     /** "On my way, about N minutes": a normal notification, not an alarm. */
     public static final String ARRIVAL_HEADS_UP = "ARRIVAL_HEADS_UP";
+    /** To the sender: a family member tapped "Got it" on their heads-up. */
+    public static final String ARRIVAL_SEEN = "ARRIVAL_SEEN";
+    /** To the sender: "Time's up — are you at the gate?" */
+    public static final String ARRIVAL_DUE = "ARRIVAL_DUE";
+    /** To someone removed from the family, so their app goes back to the join screen. */
+    public static final String MEMBER_REMOVED = "MEMBER_REMOVED";
 }

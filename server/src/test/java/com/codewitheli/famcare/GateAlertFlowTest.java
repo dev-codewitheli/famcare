@@ -1,5 +1,6 @@
 package com.codewitheli.famcare;
 
+import com.codewitheli.famcare.application.port.in.ArrivalUseCase;
 import com.codewitheli.famcare.application.port.in.GateAlertUseCase;
 import com.codewitheli.famcare.application.port.out.PushMessage;
 import com.codewitheli.famcare.application.port.out.PushNotifier;
@@ -47,6 +48,8 @@ class GateAlertFlowTest {
     MutableClock clock;
     @Autowired
     GateAlertUseCase gateAlerts;
+    @Autowired
+    ArrivalUseCase arrivals;
 
     @BeforeEach
     void setUpFamily() {
@@ -227,6 +230,111 @@ class GateAlertFlowTest {
                 .bodyJson()
                 .satisfies(json -> assertThat(json).extractingPath("$[*].id").asArray().containsExactly(second, first))
                 .extractingPath("$[1].acknowledgedBy.displayName").isEqualTo("Papa");
+    }
+
+    @Test
+    void announcingSaysWhoWasNotified() {
+        assertThat(announce("ate", 5))
+                .hasStatus(201)
+                .bodyJson().extractingPath("$.notified[*].displayName").asArray().containsExactly("Papa", "Mama");
+    }
+
+    @Test
+    void gotItTellsTheSenderOnceAndShowsWhoSawIt() {
+        String noticeId = JsonPath.read(body(announce("ate", 10).exchange()), "$.id");
+
+        assertThat(mvc.post().uri("/api/arrivals/{id}/seen", noticeId).header("Authorization", "Bearer papa"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.seenBy[*].displayName").asArray().containsExactly("Papa");
+        var seen = pushes.last();
+        assertThat(seen.message().type()).isEqualTo(PushMessage.ARRIVAL_SEEN);
+        assertThat(seen.message().data()).containsEntry("seenByName", "Papa");
+        assertThat(seen.tokens()).containsExactly("token-ate");
+
+        var pushesSoFar = pushes.sent.size();
+        mvc.post().uri("/api/arrivals/{id}/seen", noticeId).header("Authorization", "Bearer papa").exchange();
+        assertThat(pushes.sent).hasSize(pushesSoFar);
+
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$[0].seenBy[*].displayName").asArray().containsExactly("Papa");
+    }
+
+    @Test
+    void senderGetsOneTimesUpReminderAtTheExpectedTime() {
+        announce("ate", 5).exchange();
+
+        clock.advance(Duration.ofMinutes(4).plusSeconds(59));
+        arrivals.sendDueReminders();
+        assertThat(pushes.sent).noneMatch(p -> p.message().type().equals(PushMessage.ARRIVAL_DUE));
+
+        clock.advance(Duration.ofSeconds(2));
+        arrivals.sendDueReminders();
+        arrivals.sendDueReminders();
+        var due = pushes.sent.stream().filter(p -> p.message().type().equals(PushMessage.ARRIVAL_DUE)).toList();
+        assertThat(due).hasSize(1);
+        assertThat(due.getFirst().tokens()).containsExactly("token-ate");
+    }
+
+    @Test
+    void anyoneCanChangeTheirNickname() {
+        assertThat(mvc.patch().uri("/api/families/mine/me").header("Authorization", "Bearer papa")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"displayName\": \"Tatay\"}"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.members[*].displayName").asArray().containsExactly("Ate", "Tatay", "Mama");
+    }
+
+    @Test
+    void onlyTheCreatorCanRenameTheFamily() {
+        assertThat(mvc.patch().uri("/api/families/mine").header("Authorization", "Bearer papa")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"familyName\": \"Papa's\"}"))
+                .hasStatus(403)
+                .bodyJson().extractingPath("$.code").isEqualTo("FORBIDDEN");
+        assertThat(mvc.patch().uri("/api/families/mine").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"familyName\": \"Centeno Family\"}"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.name").isEqualTo("Centeno Family");
+    }
+
+    @Test
+    void creatorCanRemoveAMemberWhoKeepsTheirHistoryAndCanRejoin() {
+        var mamasRing = ring("mama");
+        mvc.post().uri("/api/gate-alerts/{id}/cancel", mamasRing).header("Authorization", "Bearer mama").exchange();
+        String mamaId = JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer mama")
+                .exchange()), "$.me.id");
+
+        assertThat(mvc.delete().uri("/api/families/mine/members/{id}", mamaId).header("Authorization", "Bearer papa"))
+                .hasStatus(403);
+        assertThat(mvc.delete().uri("/api/families/mine/members/{id}", mamaId).header("Authorization", "Bearer ate"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.members[*].displayName").asArray().containsExactly("Ate", "Papa");
+
+        var removed = pushes.last();
+        assertThat(removed.message().type()).isEqualTo(PushMessage.MEMBER_REMOVED);
+        assertThat(removed.tokens()).containsExactly("token-mama");
+
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer mama")).hasStatus(409);
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$[0].sender.displayName").isEqualTo("Mama");
+
+        ring("ate");
+        assertThat(pushes.last().tokens()).containsExactly("token-papa");
+
+        String code = JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate")
+                .exchange()), "$.inviteCode");
+        joinAs("mama", "Mama", code);
+    }
+
+    @Test
+    void creatorCannotRemoveThemselves() {
+        String ateId = JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate")
+                .exchange()), "$.me.id");
+        assertThat(mvc.delete().uri("/api/families/mine/members/{id}", ateId).header("Authorization", "Bearer ate"))
+                .hasStatus(409);
+    }
+
+    private MockMvcTester.MockMvcRequestBuilder announce(String user, int minutes) {
+        return mvc.post().uri("/api/arrivals").header("Authorization", "Bearer " + user)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"etaMinutes\": %d}".formatted(minutes));
     }
 
     private String ring(String user) {

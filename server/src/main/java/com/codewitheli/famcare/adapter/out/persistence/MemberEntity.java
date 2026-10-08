@@ -23,8 +23,18 @@ class MemberEntity {
     @Enumerated(EnumType.STRING)
     private MemberRole role;
     private Instant joinedAt;
+    private Instant removedAt;
 
     protected MemberEntity() {
+    }
+
+    /**
+     * auth_uid is unique, so it's released (replaced with a placeholder) to let the same Google
+     * account join a family again later.
+     */
+    void markRemoved(Instant now) {
+        removedAt = now;
+        authUid = "removed:" + id;
     }
 
     static MemberEntity from(Member member) {

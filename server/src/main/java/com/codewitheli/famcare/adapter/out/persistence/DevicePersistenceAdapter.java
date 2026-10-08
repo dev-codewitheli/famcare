@@ -20,6 +20,10 @@ class DevicePersistenceAdapter implements DeviceRepository {
         @Modifying
         @Query("delete from DeviceEntity d where d.pushToken in :tokens")
         void deleteByPushTokenIn(Collection<String> tokens);
+
+        @Modifying
+        @Query("delete from DeviceEntity d where d.memberId = :memberId")
+        void deleteByMemberId(UUID memberId);
     }
 
     private final Jpa jpa;
@@ -46,5 +50,10 @@ class DevicePersistenceAdapter implements DeviceRepository {
     @Override
     public void deleteTokens(Collection<String> pushTokens) {
         jpa.deleteByPushTokenIn(pushTokens);
+    }
+
+    @Override
+    public void deleteByMember(UUID memberId) {
+        jpa.deleteByMemberId(memberId);
     }
 }

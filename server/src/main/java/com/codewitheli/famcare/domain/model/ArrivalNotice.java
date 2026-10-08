@@ -6,9 +6,13 @@ import java.util.UUID;
 
 /**
  * "I'm on my way, about N minutes." Lets someone at home head to the gate before the ring.
- * A notice stays relevant a little past its expected arrival, then quietly expires.
+ * At the expected time the sender gets a "time's up" reminder; the notice stays relevant a
+ * little past its expected arrival, then quietly expires.
+ *
+ * @param dueNotifiedAt when the "time's up" reminder went out; null until then
  */
-public record ArrivalNotice(UUID id, UUID familyId, UUID memberId, int etaMinutes, Instant createdAt) {
+public record ArrivalNotice(UUID id, UUID familyId, UUID memberId, int etaMinutes, Instant createdAt,
+                            Instant dueNotifiedAt) {
 
     public static final int MIN_ETA_MINUTES = 1;
     public static final int MAX_ETA_MINUTES = 60;
@@ -24,7 +28,7 @@ public record ArrivalNotice(UUID id, UUID familyId, UUID memberId, int etaMinute
     }
 
     public static ArrivalNotice announce(UUID familyId, UUID memberId, int etaMinutes, Instant now) {
-        return new ArrivalNotice(UUID.randomUUID(), familyId, memberId, etaMinutes, now);
+        return new ArrivalNotice(UUID.randomUUID(), familyId, memberId, etaMinutes, now, null);
     }
 
     public Instant expectedAt() {
@@ -33,6 +37,15 @@ public record ArrivalNotice(UUID id, UUID familyId, UUID memberId, int etaMinute
 
     public boolean isActive(Instant now) {
         return now.isBefore(expectedAt().plus(GRACE));
+    }
+
+    /** The expected time has come and the sender hasn't been reminded yet. */
+    public boolean needsDueReminder(Instant now) {
+        return dueNotifiedAt == null && !now.isBefore(expectedAt()) && isActive(now);
+    }
+
+    public ArrivalNotice dueNotified(Instant now) {
+        return new ArrivalNotice(id, familyId, memberId, etaMinutes, createdAt, now);
     }
 
     /** Oldest creation time a notice can have and still be active, for repository queries. */
