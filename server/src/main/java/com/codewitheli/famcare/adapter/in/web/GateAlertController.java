@@ -1,6 +1,7 @@
 package com.codewitheli.famcare.adapter.in.web;
 
 import com.codewitheli.famcare.adapter.in.web.dto.GateAlertResponse;
+import com.codewitheli.famcare.adapter.in.web.dto.RingRequest;
 import com.codewitheli.famcare.application.AuthenticatedUser;
 import com.codewitheli.famcare.application.port.in.GateAlertUseCase;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,10 +27,14 @@ class GateAlertController {
         this.gateAlerts = gateAlerts;
     }
 
-    /** "I'm at the gate". Tapping twice doesn't double-ring: the active alert is returned. */
+    /**
+     * "I'm at the gate", ringing the chosen members (no body: everyone else). Tapping twice doesn't
+     * double-ring: the active alert is returned.
+     */
     @PostMapping
-    GateAlertResponse ring(@AuthenticationPrincipal AuthenticatedUser user) {
-        return GateAlertResponse.from(gateAlerts.ring(user));
+    GateAlertResponse ring(@AuthenticationPrincipal AuthenticatedUser user,
+                           @RequestBody(required = false) RingRequest request) {
+        return GateAlertResponse.from(gateAlerts.ring(user, request == null ? null : request.recipientIds()));
     }
 
     /** 204 when nobody is at the gate. */

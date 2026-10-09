@@ -1,7 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Gate alerts ring like an incoming call, even on the lock screen. -->
+    <!-- Gate alerts ring like an incoming call: a full-screen intent wakes the screen, while the
+         phone stays locked (the app never shows over the lock screen). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -15,15 +16,12 @@
         android:label="HomeBell"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <!-- showWhenLocked + turnScreenOn: the full-screen gate alert appears over the lock screen. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">

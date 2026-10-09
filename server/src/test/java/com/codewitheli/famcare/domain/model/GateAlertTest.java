@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +19,7 @@ class GateAlertTest {
 
     @Test
     void newAlertRingsOnce() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
 
         assertThat(alert.status()).isEqualTo(GateAlertStatus.RINGING);
         assertThat(alert.ringCount()).isEqualTo(1);
@@ -26,7 +27,7 @@ class GateAlertTest {
 
     @Test
     void familyMemberCanAcknowledge() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
 
         alert.acknowledge(papa, T0.plusSeconds(10));
 
@@ -37,14 +38,14 @@ class GateAlertTest {
 
     @Test
     void senderCannotAcknowledgeTheirOwnAlert() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
 
         assertThatThrownBy(() -> alert.acknowledge(sender, T0)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void onlyTheSenderCanCancel() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
 
         assertThatThrownBy(() -> alert.cancel(papa, T0)).isInstanceOf(IllegalStateException.class);
         alert.cancel(sender, T0);
@@ -53,7 +54,7 @@ class GateAlertTest {
 
     @Test
     void answeredAlertCannotBeAnsweredAgain() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
         alert.acknowledge(papa, T0);
 
         assertThatThrownBy(() -> alert.acknowledge(UUID.randomUUID(), T0))
@@ -63,7 +64,7 @@ class GateAlertTest {
 
     @Test
     void isDueForAnotherRingOnlyAfterTheInterval() {
-        var alert = GateAlert.ring(family, sender, T0);
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
         var interval = Duration.ofSeconds(30);
 
         assertThat(alert.isDueForRing(T0.plusSeconds(29), interval)).isFalse();
@@ -72,5 +73,31 @@ class GateAlertTest {
         alert.ringAgain(T0.plusSeconds(30));
         assertThat(alert.ringCount()).isEqualTo(2);
         assertThat(alert.isDueForRing(T0.plusSeconds(45), interval)).isFalse();
+    }
+
+    @Test
+    void ringsOnlyTheChosenMembers() {
+        var mama = UUID.randomUUID();
+        var alert = GateAlert.ring(family, sender, Set.of(mama), T0);
+
+        assertThat(alert.rings(mama)).isTrue();
+        assertThat(alert.rings(papa)).isFalse();
+        assertThat(alert.rings(sender)).isFalse();
+        assertThat(alert.involves(sender)).isTrue();
+        assertThat(alert.involves(papa)).isFalse();
+    }
+
+    @Test
+    void alertsWithoutChosenMembersRingEveryoneElse() {
+        var alert = GateAlert.ring(family, sender, Set.of(), T0);
+
+        assertThat(alert.rings(papa)).isTrue();
+        assertThat(alert.rings(sender)).isFalse();
+    }
+
+    @Test
+    void senderCannotRingThemselves() {
+        assertThatThrownBy(() -> GateAlert.ring(family, sender, Set.of(sender), T0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

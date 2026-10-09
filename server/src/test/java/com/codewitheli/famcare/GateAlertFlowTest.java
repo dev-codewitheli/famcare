@@ -28,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -150,6 +151,48 @@ class GateAlertFlowTest {
         var expired = pushes.last();
         assertThat(expired.message().type()).isEqualTo(PushMessage.GATE_EXPIRED);
         assertThat(expired.tokens()).contains("token-ate");       // "nobody answered — try calling"
+    }
+
+    @Test
+    void ringsOnlyTheChosenMembersEveryTime() {
+        var mamaId = memberId("Mama");
+        var result = mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientIds\": [\"%s\"]}".formatted(mamaId))
+                .exchange();
+        assertThat(result).hasStatusOk()
+                .bodyJson().extractingPath("$.recipients[*].displayName").asArray().containsExactly("Mama");
+        String alertId = JsonPath.read(body(result), "$.id");
+        assertThat(pushes.last().tokens()).containsExactly("token-mama");
+
+        clock.advance(Duration.ofSeconds(30));
+        gateAlerts.processRingingAlerts();
+        assertThat(pushes.last().message().data()).containsEntry("ringCount", "2");
+        assertThat(pushes.last().tokens()).containsExactly("token-mama");   // Papa (at work) isn't disturbed
+
+        // Anyone at home can still answer; only the people involved hear about it.
+        assertThat(mvc.post().uri("/api/gate-alerts/{id}/acknowledge", alertId).header("Authorization", "Bearer papa"))
+                .hasStatusOk();
+        assertThat(pushes.last().tokens()).containsExactlyInAnyOrder("token-ate", "token-mama");
+    }
+
+    @Test
+    void ringingWithoutChoosingRingsEveryoneElse() {
+        assertThat(mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer ate"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.recipients[*].displayName").asArray()
+                .containsExactlyInAnyOrder("Papa", "Mama");
+    }
+
+    @Test
+    void mustRingAtLeastOneOtherFamilyMember() {
+        for (var recipients : List.of("[]", "[\"%s\"]".formatted(memberId("Ate")), "[\"%s\"]".formatted(UUID.randomUUID()))) {
+            assertThat(mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer ate")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"recipientIds\": %s}".formatted(recipients)))
+                    .hasStatus(400);
+        }
+        assertThat(pushes.sent).isEmpty();
     }
 
     @Test
@@ -442,6 +485,12 @@ class GateAlertFlowTest {
         var result = mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer " + user).exchange();
         assertThat(result).hasStatusOk();
         return JsonPath.read(body(result), "$.id");
+    }
+
+    private String memberId(String displayName) {
+        List<String> ids = JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate")
+                .exchange()), "$.members[?(@.displayName == '%s')].id".formatted(displayName));
+        return ids.getFirst();
     }
 
     private static String body(MvcTestResult result) {

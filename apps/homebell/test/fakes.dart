@@ -12,8 +12,10 @@ GateAlert alert({
   GateAlertStatus status = GateAlertStatus.ringing,
   Member? acknowledgedBy,
   DateTime? resolvedAt,
+  List<Member> recipients = const [],
 }) =>
     GateAlert(
+      recipients: recipients,
       id: id,
       status: status,
       sender: sender,
@@ -42,8 +44,13 @@ class FakeGateApi implements GateApi {
   @override
   Future<GateAlert?> active() async => activeAlert;
 
+  List<String>? rungRecipients;
+
   @override
-  Future<GateAlert> ring() async => activeAlert ??= alert(sender: me);
+  Future<GateAlert> ring({List<String>? recipientIds}) async {
+    rungRecipients = recipientIds;
+    return activeAlert ??= alert(sender: me);
+  }
 
   @override
   Future<GateAlert> get(String id) async => ended[id]!;

@@ -21,10 +21,12 @@ Built with **Flutter** (Android) + a little **Kotlin**, **Java 21 + Spring Boot 
 
 ## HomeBell: ring the family from the gate
 
-1. Tap **"I'm at the gate"**.
-2. Every other family phone **rings like an incoming call**: a full-screen alert over the lock
-   screen, the alarm sound and vibration, repeating until someone answers.
-3. Someone taps **"Coming!"** and the person at the gate sees *"Papa is coming!"*.
+1. Tap **"I'm at the gate"**. It rings everyone, or only the people you pick (say, not whoever
+   is at school or work); your phone remembers the choice.
+2. Their phones **ring like an incoming call**: the screen wakes with an alarm sound and
+   vibration, repeating until someone answers. Locked phones stay locked.
+3. Someone taps **"Coming!"**, right from the lock-screen notification, and the person at the
+   gate sees *"Papa is coming!"*.
 4. If nobody answers, it rings again every 30 s, up to 4 times, then tells the sender
    *"Nobody answered, try calling."*
 
@@ -45,8 +47,9 @@ invite code, leave), in-app account deletion, and an optional per-phone
 - **Data-only, high-priority FCM pushes** wake phones in Doze, and the app decides how to
   present them. A regular notification push would show quietly instead of ringing.
 - **Alarm-grade notifications**: a dedicated channel with `USAGE_ALARM` audio, `FLAG_INSISTENT`
-  looping, a full-screen intent, and `showWhenLocked`/`turnScreenOn` on the activity. Opening the
-  app over the lock screen doesn't stop the ring; only "Coming!" does.
+  looping, and a full-screen intent that wakes the screen while the phone stays locked. "Coming!"
+  runs in a background isolate (no unlock needed), and opening the app doesn't stop the ring;
+  only "Coming!" does.
 - **Server-side scheduling** (Spring `@Scheduled`): re-rings and expiry, "time's up" reminders,
   and nightly data retention, so a missed push never leaves someone stuck at the gate.
 - **Per-brand phone setup** for Xiaomi, OPPO/OnePlus, realme, vivo, Samsung and Infinix/Tecno:

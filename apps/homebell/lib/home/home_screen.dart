@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../gate/gate_api.dart';
 import '../gate/gate_controller.dart';
 import '../gate/gate_notifications.dart';
+import '../gate/ring_settings.dart';
 import '../settings/settings_screen.dart';
 import '../setup/phone_setup.dart';
 import '../setup/setup_screen.dart';
@@ -36,6 +37,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription<RemoteMessage>? _pushes;
   bool _setupNeeded = false;
 
+  /// Who "I'm at the gate" leaves out; remembered on this phone.
+  Set<String> _leftOut = const {};
+
+  List<Member> get _others {
+    final family = widget.session.family!;
+    return family.members.where((m) => m.id != family.me.id).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +64,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     }
     _startPolling();
+    RingSettings.leftOut().then((ids) {
+      if (mounted) setState(() => _leftOut = ids);
+    });
     _askForNotificationsThenCheckSetup();
     GateNotifications.launchResponse().then(_handleResponse);
   }
@@ -123,8 +135,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ringingFor = current;
   }
 
-  /// A tap on the ring notification, or the full-screen alert opening the app over the lock
-  /// screen. Opening the app must NOT stop the ring: like an incoming call, it keeps ringing
+  /// A tap on the ring notification (after unlocking), or the app opened by the full-screen
+  /// alert. Opening the app must NOT stop the ring: like an incoming call, it keeps ringing
   /// while the screen shows "… is at the gate" until someone actually answers.
   Future<void> _handleResponse(NotificationResponse? response) async {
     final payload = response?.payload;
@@ -177,8 +189,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _ring() async {
     await GateNotifications.cancelDueReminder();
-    await _gate.ring();
+    await _gate.ring(recipientIds: ringRecipientIds(_others, _leftOut));
     await _activity.refresh();
+  }
+
+  Future<void> _chooseRecipients() async {
+    final leftOut = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => RecipientsSheet(others: _others, leftOut: _leftOut),
+    );
+    if (leftOut == null) return;
+    await RingSettings.setLeftOut(leftOut);
+    if (mounted) setState(() => _leftOut = leftOut);
   }
 
   Future<void> _cancelHeadsUp() async {
@@ -243,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 16),
                   FamilyStrip(
-                    members: family.members.where((m) => m.id != family.me.id).toList(),
+                    members: _others,
                     onTap: () => _open(FamilyScreen(session: widget.session)),
                   ),
                   if (_setupNeeded) ...[
@@ -258,7 +282,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: switch (state) {
-                      Idle() => GateButtonCard(key: const ValueKey('idle'), busy: _gate.busy, onRing: _ring),
+                      Idle() => GateButtonCard(
+                          key: const ValueKey('idle'),
+                          busy: _gate.busy,
+                          onRing: _ring,
+                          ringing: switch (ringRecipientIds(_others, _leftOut)) {
+                            null => null,
+                            final ids => [for (final m in _others) if (ids.contains(m.id)) m],
+                          },
+                          onChooseRecipients: _others.isEmpty ? null : _chooseRecipients),
                       Ringing(:final alert) => RingingCard(
                           key: const ValueKey('ringing'),
                           alert: alert,
@@ -268,6 +300,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           key: const ValueKey('someone'),
                           alert: alert,
                           busy: _gate.busy,
+                          ringsMe: alert.rings(_myId),
                           onComing: () => _answer(alert.id)),
                       Outcome(:final alert) => OutcomeCard(
                           key: const ValueKey('outcome'), alert: alert, onDone: _gate.dismissOutcome),

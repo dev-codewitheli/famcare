@@ -35,7 +35,12 @@
 - [x] Privacy policy page, Crashlytics, release workflow (tag → signed APKs on GitHub Releases)
 - [x] README screenshots and portfolio card
 
-## v0.5: FamCare (vitamin tracker)
+## v0.5: Choose who rings; lock-screen privacy (done)
+- [x] Pick who "I'm at the gate" rings (e.g. not whoever is at school or work), remembered per phone
+- [x] The app no longer shows over the lock screen; a ring wakes the screen with a lock-screen
+      notification, and "Coming!" works from it without unlocking
+
+## v0.6: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day
 - [ ] Daily checklist that resets at midnight (Asia/Manila); tick to mark as taken
 - [ ] Server-side "remind only if not taken yet" push at each scheduled time

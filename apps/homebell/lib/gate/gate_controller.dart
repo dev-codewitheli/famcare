@@ -49,7 +49,9 @@ class GateController extends ChangeNotifier {
 
   Future<void> refresh() => _run(_sync, showBusy: false);
 
-  Future<void> ring() => _run(() async => _apply(await api.ring()));
+  /// Rings [recipientIds], or everyone else when null.
+  Future<void> ring({List<String>? recipientIds}) =>
+      _run(() async => _apply(await api.ring(recipientIds: recipientIds)));
 
   Future<void> coming(String alertId) => _run(() async {
         await api.acknowledge(alertId);

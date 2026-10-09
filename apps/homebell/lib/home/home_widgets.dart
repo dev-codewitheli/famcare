@@ -2,6 +2,7 @@ import 'package:family_core/family_core.dart';
 import 'package:flutter/material.dart';
 
 import '../gate/gate_api.dart';
+import '../gate/ring_settings.dart';
 
 /// The other family members, at a glance.
 class FamilyStrip extends StatelessWidget {
@@ -64,8 +65,8 @@ class FamilyStrip extends StatelessWidget {
 
   static String _names(List<Member> members) {
     final names = members.map((m) => m.displayName).toList();
-    if (names.length <= 3) return '${names.join(', ')} will be rung';
-    return '${names.take(2).join(', ')} and ${names.length - 2} more will be rung';
+    if (names.length <= 3) return joinNames(names);
+    return '${names.take(2).join(', ')} and ${names.length - 2} more';
   }
 }
 
@@ -145,17 +146,31 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
   }
 }
 
-/// The big "I'm at the gate" button.
+/// The big "I'm at the gate" button, and who it rings.
 class GateButtonCard extends StatelessWidget {
-  const GateButtonCard({super.key, required this.busy, required this.onRing});
+  const GateButtonCard({
+    super.key,
+    required this.busy,
+    required this.onRing,
+    this.ringing,
+    this.onChooseRecipients,
+  });
 
   final bool busy;
   final VoidCallback onRing;
+
+  /// Who gets rung: null for everyone, empty when the user left everybody out.
+  final List<Member>? ringing;
+
+  /// Null when there's nobody to choose from (no other family members yet).
+  final VoidCallback? onChooseRecipients;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final ringing = this.ringing;
+    final nobody = ringing != null && ringing.isEmpty;
     return Column(
       children: [
         _Pulse(
@@ -164,7 +179,7 @@ class GateButtonCard extends StatelessWidget {
           child: SizedBox.square(
             dimension: 210,
             child: FilledButton(
-              onPressed: busy ? null : onRing,
+              onPressed: busy || nobody ? null : onRing,
               style: FilledButton.styleFrom(
                 shape: const CircleBorder(),
                 elevation: 8,
@@ -184,10 +199,92 @@ class GateButtonCard extends StatelessWidget {
             ),
           ),
         ),
-        Text('Tap when you arrive. Everyone at home gets the ring.',
+        Text('Tap when you arrive.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
+        if (onChooseRecipients != null) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: busy ? null : onChooseRecipients,
+            icon: Icon(nobody ? Icons.error_outline_rounded : Icons.group_rounded),
+            label: Text(
+              switch (ringing) {
+                null => 'Rings everyone',
+                [] => 'Nobody to ring. Choose who',
+                _ => 'Rings ${joinNames([for (final m in ringing) m.displayName])}',
+              },
+              textAlign: TextAlign.center,
+            ),
+            style: nobody ? TextButton.styleFrom(foregroundColor: colors.error) : null,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Choose who "I'm at the gate" rings. Returns who's left out, or null if dismissed.
+class RecipientsSheet extends StatefulWidget {
+  const RecipientsSheet({super.key, required this.others, required this.leftOut});
+
+  final List<Member> others;
+  final Set<String> leftOut;
+
+  @override
+  State<RecipientsSheet> createState() => _RecipientsSheetState();
+}
+
+class _RecipientsSheetState extends State<RecipientsSheet> {
+  late final Set<String> _leftOut = {...widget.leftOut};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final nobody = widget.others.every((m) => _leftOut.contains(m.id));
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Who should ring?', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text('Uncheck anyone who\'s out, like at school or work. Your phone remembers this '
+                      'until you change it.'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final m in widget.others)
+                    CheckboxListTile(
+                      value: !_leftOut.contains(m.id),
+                      onChanged: (rung) => setState(() => rung! ? _leftOut.remove(m.id) : _leftOut.add(m.id)),
+                      secondary: MemberAvatar(name: m.displayName),
+                      title: Text(m.displayName),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: FilledButton(
+                onPressed: nobody ? null : () => Navigator.of(context).pop(_leftOut),
+                child: Text(nobody ? 'Pick at least one person' : 'Done'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -219,7 +316,13 @@ class RingingCard extends StatelessWidget {
                 child: Icon(Icons.ring_volume_rounded, size: 52, color: colors.onPrimary),
               ),
             ),
-            Text('Ringing the family…', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              alert.recipients.isEmpty
+                  ? 'Ringing the family…'
+                  : 'Ringing ${joinNames([for (final m in alert.recipients) m.displayName])}…',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 6),
             Text(
               alert.ringCount <= 1 ? 'Waiting for someone to tap "Coming!"' : 'Ring ${alert.ringCount}: still waiting…',
@@ -239,11 +342,20 @@ class RingingCard extends StatelessWidget {
 }
 
 class SomeoneAtGateCard extends StatelessWidget {
-  const SomeoneAtGateCard({super.key, required this.alert, required this.busy, required this.onComing});
+  const SomeoneAtGateCard({
+    super.key,
+    required this.alert,
+    required this.busy,
+    required this.onComing,
+    this.ringsMe = true,
+  });
 
   final GateAlert alert;
   final bool busy;
   final VoidCallback onComing;
+
+  /// False when the sender left me out (e.g. I'm at work), so I only see it in the app.
+  final bool ringsMe;
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +381,8 @@ class SomeoneAtGateCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            Text('Let them know someone is on the way',
+            Text(ringsMe ? 'Let them know someone is on the way' : 'You weren\'t rung, but you can still answer',
+                textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70)),
             const SizedBox(height: 20),
             FilledButton.icon(

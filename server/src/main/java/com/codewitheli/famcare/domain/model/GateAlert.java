@@ -2,10 +2,11 @@ package com.codewitheli.famcare.domain.model;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * "I'm at the gate" — rings every other family member's phone until someone
+ * "I'm at the gate" — rings the family members the sender picked until someone
  * acknowledges it, the sender cancels it, or it expires unanswered.
  */
 public class GateAlert {
@@ -13,6 +14,8 @@ public class GateAlert {
     private final UUID id;
     private final UUID familyId;
     private final UUID senderId;
+    /** Empty for alerts from before recipients could be picked: those ring everyone else. */
+    private final Set<UUID> recipientIds;
     private final Instant createdAt;
     private GateAlertStatus status;
     private int ringCount;
@@ -20,11 +23,13 @@ public class GateAlert {
     private UUID acknowledgedBy;
     private Instant resolvedAt;
 
-    public GateAlert(UUID id, UUID familyId, UUID senderId, Instant createdAt, GateAlertStatus status,
-                     int ringCount, Instant lastRungAt, UUID acknowledgedBy, Instant resolvedAt) {
+    public GateAlert(UUID id, UUID familyId, UUID senderId, Set<UUID> recipientIds, Instant createdAt,
+                     GateAlertStatus status, int ringCount, Instant lastRungAt, UUID acknowledgedBy,
+                     Instant resolvedAt) {
         this.id = id;
         this.familyId = familyId;
         this.senderId = senderId;
+        this.recipientIds = Set.copyOf(recipientIds);
         this.createdAt = createdAt;
         this.status = status;
         this.ringCount = ringCount;
@@ -34,9 +39,22 @@ public class GateAlert {
     }
 
     /** A new alert counts as its first ring. */
-    public static GateAlert ring(UUID familyId, UUID senderId, Instant now) {
-        return new GateAlert(UUID.randomUUID(), familyId, senderId, now, GateAlertStatus.RINGING,
+    public static GateAlert ring(UUID familyId, UUID senderId, Set<UUID> recipientIds, Instant now) {
+        if (recipientIds.contains(senderId)) {
+            throw new IllegalArgumentException("The person at the gate can't ring themselves");
+        }
+        return new GateAlert(UUID.randomUUID(), familyId, senderId, recipientIds, now, GateAlertStatus.RINGING,
                 1, now, null, null);
+    }
+
+    /** Whether this member's phone rings for the alert. */
+    public boolean rings(UUID memberId) {
+        return !memberId.equals(senderId) && (recipientIds.isEmpty() || recipientIds.contains(memberId));
+    }
+
+    /** The sender and everyone rung: who hears how the alert ends. */
+    public boolean involves(UUID memberId) {
+        return memberId.equals(senderId) || rings(memberId);
     }
 
     public void acknowledge(UUID memberId, Instant now) {
@@ -83,6 +101,7 @@ public class GateAlert {
     public UUID id() { return id; }
     public UUID familyId() { return familyId; }
     public UUID senderId() { return senderId; }
+    public Set<UUID> recipientIds() { return recipientIds; }
     public Instant createdAt() { return createdAt; }
     public GateAlertStatus status() { return status; }
     public int ringCount() { return ringCount; }

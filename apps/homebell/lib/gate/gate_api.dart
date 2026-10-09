@@ -11,6 +11,7 @@ class GateAlert {
     required this.ringCount,
     required this.createdAt,
     this.resolvedAt,
+    this.recipients = const [],
   });
 
   factory GateAlert.fromJson(Map<String, dynamic> json) => GateAlert(
@@ -23,6 +24,10 @@ class GateAlert {
         ringCount: json['ringCount'] as int,
         createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
         resolvedAt: json['resolvedAt'] == null ? null : DateTime.parse(json['resolvedAt'] as String).toLocal(),
+        recipients: [
+          for (final m in json['recipients'] as List<dynamic>? ?? const [])
+            Member.fromJson(m as Map<String, dynamic>),
+        ],
       );
 
   final String id;
@@ -32,6 +37,13 @@ class GateAlert {
   final int ringCount;
   final DateTime createdAt;
   final DateTime? resolvedAt;
+
+  /// Who was rung. Empty for alerts from older versions, which rang everyone else.
+  final List<Member> recipients;
+
+  /// Whether this alert rings the given member's phone.
+  bool rings(String memberId) =>
+      memberId != sender.id && (recipients.isEmpty || recipients.any((m) => m.id == memberId));
 
   /// How long the person waited for a "Coming!", when someone answered.
   Duration? get answeredAfter =>
@@ -96,8 +108,10 @@ class GateApi {
 
   final ApiClient _api;
 
-  /// "I'm at the gate". Returns the already-ringing alert if someone tapped first.
-  Future<GateAlert> ring() async => GateAlert.fromJson(await _api.post('/api/gate-alerts'));
+  /// "I'm at the gate", ringing [recipientIds] (null: everyone else). Returns the already-ringing
+  /// alert if someone tapped first.
+  Future<GateAlert> ring({List<String>? recipientIds}) async => GateAlert.fromJson(await _api.post(
+      '/api/gate-alerts', recipientIds == null ? null : {'recipientIds': recipientIds}));
 
   /// The family's ringing alert, or null when nobody is at the gate.
   Future<GateAlert?> active() async {

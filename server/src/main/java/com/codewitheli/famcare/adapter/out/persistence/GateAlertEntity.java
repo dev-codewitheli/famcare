@@ -2,13 +2,20 @@ package com.codewitheli.famcare.adapter.out.persistence;
 
 import com.codewitheli.famcare.domain.model.GateAlert;
 import com.codewitheli.famcare.domain.model.GateAlertStatus;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -19,6 +26,10 @@ class GateAlertEntity {
     private UUID id;
     private UUID familyId;
     private UUID senderId;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "gate_alert_recipients", joinColumns = @JoinColumn(name = "alert_id"))
+    @Column(name = "member_id")
+    private Set<UUID> recipientIds = new HashSet<>();
     private Instant createdAt;
     @Enumerated(EnumType.STRING)
     private GateAlertStatus status;
@@ -35,6 +46,7 @@ class GateAlertEntity {
         entity.id = alert.id();
         entity.familyId = alert.familyId();
         entity.senderId = alert.senderId();
+        entity.recipientIds = new HashSet<>(alert.recipientIds());
         entity.createdAt = alert.createdAt();
         entity.status = alert.status();
         entity.ringCount = alert.ringCount();
@@ -45,7 +57,7 @@ class GateAlertEntity {
     }
 
     GateAlert toDomain() {
-        return new GateAlert(id, familyId, senderId, createdAt, status, ringCount, lastRungAt,
+        return new GateAlert(id, familyId, senderId, recipientIds, createdAt, status, ringCount, lastRungAt,
                 acknowledgedBy, resolvedAt);
     }
 }

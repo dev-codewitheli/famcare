@@ -5,12 +5,16 @@ import com.codewitheli.famcare.application.GateAlertView;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface GateAlertUseCase {
 
-    /** "I'm at the gate" — rings everyone else. Returns the existing alert if one is already ringing. */
-    GateAlertView ring(AuthenticatedUser user);
+    /**
+     * "I'm at the gate" — rings the chosen family members (null: everyone else). Returns the existing
+     * alert if one is already ringing.
+     */
+    GateAlertView ring(AuthenticatedUser user, Set<UUID> recipientIds);
 
     /** "Coming!" */
     GateAlertView acknowledge(AuthenticatedUser user, UUID alertId);

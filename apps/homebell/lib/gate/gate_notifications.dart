@@ -2,6 +2,7 @@ import 'package:family_core/family_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'gate_push_handler.dart';
 import 'ring_settings.dart';
 
 /// Turns gate pushes into what each phone should do: ring like an alarm, tell the
@@ -47,6 +48,8 @@ class GateNotifications {
         android: AndroidInitializationSettings('ic_stat_bell'),
       ),
       onDidReceiveNotificationResponse: inForeground ? (r) => responses.value = r : null,
+      // "Coming!" works without opening the app, so it can be answered from the lock screen.
+      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationAction,
     );
     final android = _android;
     await android?.createNotificationChannel(_ringChannel(ringChannelId, bypassDnd: false));
@@ -161,6 +164,9 @@ class GateNotifications {
           priority: Priority.max,
           channelBypassDnd: throughDnd,
           category: AndroidNotificationCategory.alarm,
+          // Wakes the screen and keeps the ring on top, like an incoming call. The app itself
+          // doesn't show over the lock screen: the phone stays locked, and "Coming!" works
+          // right from the notification.
           fullScreenIntent: true,
           audioAttributesUsage: AudioAttributesUsage.alarm,
           sound: _alarmSound,
@@ -172,12 +178,17 @@ class GateNotifications {
           // Safety net in case the "stop ringing" push is lost: the server gives up after ~2 minutes.
           timeoutAfter: const Duration(minutes: 3).inMilliseconds,
           actions: const [
-            AndroidNotificationAction(comingActionId, 'Coming!', showsUserInterface: true),
+            // Handled in the background (onBackgroundNotificationAction): no unlocking needed.
+            AndroidNotificationAction(comingActionId, 'Coming!'),
           ],
         ),
       ),
     );
   }
+
+  /// "Coming!" from the notification couldn't reach the server.
+  static Future<void> showComingFailed(String alertId) => _showUpdate(alertId,
+      'Couldn\'t send "Coming!"', 'Open HomeBell and tap "Coming!" again, or call them.');
 
   static Future<void> _showArrival(Map<String, dynamic> data) {
     final name = data['senderName'] as String? ?? 'Someone';

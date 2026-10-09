@@ -16,12 +16,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -51,17 +54,36 @@ public class GateAlertService implements GateAlertUseCase {
     }
 
     @Override
-    public GateAlertView ring(AuthenticatedUser user) {
+    public GateAlertView ring(AuthenticatedUser user, Set<UUID> recipientIds) {
         var me = memberLookup.require(user);
         var existing = alerts.findRingingByFamily(me.familyId());
         if (existing.isPresent()) {
             return view(existing.get());
         }
+        var recipients = chooseRecipients(me, recipientIds);
         // They've arrived, so their "on my way" heads-up is done.
         arrivals.deleteByMember(me.id());
-        var alert = alerts.save(GateAlert.ring(me.familyId(), me.id(), clock.instant()));
+        var alert = alerts.save(GateAlert.ring(me.familyId(), me.id(), recipients, clock.instant()));
         sendRing(alert, me);
         return view(alert);
+    }
+
+    /** Null means everyone else; otherwise at least one current member of my family, not me. */
+    private Set<UUID> chooseRecipients(Member me, Set<UUID> requested) {
+        var others = members.findByFamilyId(me.familyId()).stream()
+                .map(Member::id)
+                .filter(id -> !id.equals(me.id()))
+                .collect(Collectors.toSet());
+        if (requested == null) {
+            return others;
+        }
+        if (requested.isEmpty()) {
+            throw new IllegalArgumentException("Pick at least one person to ring");
+        }
+        if (!others.containsAll(requested)) {
+            throw new IllegalArgumentException("You can only ring other members of your family");
+        }
+        return requested;
     }
 
     @Override
@@ -70,8 +92,8 @@ public class GateAlertService implements GateAlertUseCase {
         var alert = requireFamilyAlert(alertId, me);
         alert.acknowledge(me.id(), clock.instant());
         alerts.save(alert);
-        // Everyone else gets it: the sender sees "Papa is coming", the others stop ringing.
-        notifyFamily(alert, m -> !m.id().equals(me.id()), PushMessage.GATE_ACKNOWLEDGED,
+        // The sender sees "Papa is coming"; the others who were rung stop ringing.
+        notifyFamily(alert, m -> alert.involves(m.id()) && !m.id().equals(me.id()), PushMessage.GATE_ACKNOWLEDGED,
                 Map.of("acknowledgedByName", me.displayName()));
         return view(alert);
     }
@@ -82,7 +104,8 @@ public class GateAlertService implements GateAlertUseCase {
         var alert = requireFamilyAlert(alertId, me);
         alert.cancel(me.id(), clock.instant());
         alerts.save(alert);
-        notifyFamily(alert, m -> !m.id().equals(me.id()), PushMessage.GATE_CANCELLED, Map.of());
+        notifyFamily(alert, m -> alert.involves(m.id()) && !m.id().equals(me.id()), PushMessage.GATE_CANCELLED,
+                Map.of());
         return view(alert);
     }
 
@@ -119,7 +142,7 @@ public class GateAlertService implements GateAlertUseCase {
                 alert.expire(now);
                 alerts.save(alert);
                 // The sender gets "nobody answered — try calling"; everyone else's phone goes quiet.
-                notifyFamily(alert, m -> true, PushMessage.GATE_EXPIRED, Map.of());
+                notifyFamily(alert, m -> alert.involves(m.id()), PushMessage.GATE_EXPIRED, Map.of());
                 log.info("Gate alert {} expired after {} rings", alert.id(), alert.ringCount());
             } else {
                 alert.ringAgain(now);
@@ -130,7 +153,7 @@ public class GateAlertService implements GateAlertUseCase {
     }
 
     private void sendRing(GateAlert alert, Member sender) {
-        notifyFamily(alert, m -> !m.id().equals(sender.id()), PushMessage.GATE_RING,
+        notifyFamily(alert, m -> alert.rings(m.id()), PushMessage.GATE_RING,
                 Map.of("senderName", sender.displayName(), "ringCount", String.valueOf(alert.ringCount())));
     }
 
@@ -153,6 +176,11 @@ public class GateAlertService implements GateAlertUseCase {
         var sender = members.findById(alert.senderId()).orElseThrow();
         var acknowledgedBy = alert.acknowledgedBy() == null ? null
                 : members.findById(alert.acknowledgedBy()).orElse(null);
-        return new GateAlertView(alert, sender, acknowledgedBy);
+        var recipients = alert.recipientIds().stream()
+                .map(members::findById)
+                .flatMap(Optional::stream)
+                .sorted(Comparator.comparing(Member::displayName))
+                .toList();
+        return new GateAlertView(alert, sender, acknowledgedBy, recipients);
     }
 }
