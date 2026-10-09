@@ -13,7 +13,13 @@ import 'gate/gate_push_handler.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final config = AppConfig.fromEnvironment();
-  await GateNotifications.init();
+  try {
+    await GateNotifications.init();
+  } catch (error) {
+    // Never let notification setup keep the app from opening (0.4.0 froze on the splash
+    // screen this way); Settings → Phone setup still shows what's wrong.
+    debugPrint('Notification setup failed: $error');
+  }
 
   final AuthService auth;
   if (config.usesFirebase) {

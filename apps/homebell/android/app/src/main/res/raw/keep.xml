@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release builds drop resources nothing references by ID. The notification icon is looked up
+     by name from Dart (AndroidInitializationSettings('ic_stat_bell')), so keep it explicitly. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_bell" />
