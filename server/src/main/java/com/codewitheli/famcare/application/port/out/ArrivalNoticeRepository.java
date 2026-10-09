@@ -29,6 +29,8 @@ public interface ArrivalNoticeRepository {
     /** Retention: notices created before the cutoff (long expired). Returns how many were deleted. */
     int deleteCreatedBefore(Instant cutoff);
 
+    void deleteByFamily(UUID familyId);
+
     /** Who has seen each notice, in the order they tapped "Got it". */
     Map<UUID, List<UUID>> seenBy(Collection<UUID> noticeIds);
 }

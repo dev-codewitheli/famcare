@@ -31,6 +31,10 @@ class ArrivalNoticePersistenceAdapter implements ArrivalNoticeRepository {
         @Modifying
         @Query("delete from ArrivalNoticeEntity n where n.createdAt < :cutoff")
         int deleteCreatedBefore(Instant cutoff);
+
+        @Modifying
+        @Query("delete from ArrivalNoticeEntity n where n.familyId = :familyId")
+        void deleteByFamilyId(UUID familyId);
     }
 
     interface SeenJpa extends JpaRepository<ArrivalSeenEntity, ArrivalSeenEntity.Key> {
@@ -80,6 +84,12 @@ class ArrivalNoticePersistenceAdapter implements ArrivalNoticeRepository {
     public int deleteCreatedBefore(Instant cutoff) {
         // arrival_seen rows go with them (ON DELETE CASCADE).
         return jpa.deleteCreatedBefore(cutoff);
+    }
+
+    @Override
+    public void deleteByFamily(UUID familyId) {
+        // arrival_seen rows go with them (ON DELETE CASCADE).
+        jpa.deleteByFamilyId(familyId);
     }
 
     @Override

@@ -35,4 +35,9 @@ class FamilyPersistenceAdapter implements FamilyRepository {
     public Optional<Family> findByInviteCode(String inviteCode) {
         return jpa.findByInviteCode(inviteCode).map(FamilyEntity::toDomain);
     }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpa.deleteById(id);
+    }
 }

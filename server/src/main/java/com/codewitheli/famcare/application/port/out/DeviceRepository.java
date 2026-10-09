@@ -16,4 +16,7 @@ public interface DeviceRepository {
 
     /** Removes the token only if it's registered to that member. */
     void deleteToken(UUID memberId, String pushToken);
+
+    /** Every phone of anyone who was ever in the family. */
+    void deleteByFamily(UUID familyId);
 }

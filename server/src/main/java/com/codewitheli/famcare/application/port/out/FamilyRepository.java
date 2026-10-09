@@ -11,4 +11,7 @@ public interface FamilyRepository {
     Optional<Family> findById(UUID id);
 
     Optional<Family> findByInviteCode(String inviteCode);
+
+    /** Callers delete what references the family first (members, activity). */
+    void deleteById(UUID id);
 }

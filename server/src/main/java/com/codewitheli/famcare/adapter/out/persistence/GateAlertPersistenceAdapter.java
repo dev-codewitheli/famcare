@@ -28,6 +28,10 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
         @Modifying
         @Query("delete from GateAlertEntity a where a.createdAt < :cutoff and a.status <> :ringing")
         int deleteCreatedBefore(Instant cutoff, GateAlertStatus ringing);
+
+        @Modifying
+        @Query("delete from GateAlertEntity a where a.familyId = :familyId")
+        void deleteByFamilyId(UUID familyId);
     }
 
     private final Jpa jpa;
@@ -60,6 +64,12 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
     @Override
     public int deleteFinishedCreatedBefore(Instant cutoff) {
         return jpa.deleteCreatedBefore(cutoff, GateAlertStatus.RINGING);
+    }
+
+    @Override
+    public void deleteByFamily(UUID familyId) {
+        // gate_alert_recipients rows go with them (ON DELETE CASCADE).
+        jpa.deleteByFamilyId(familyId);
     }
 
     @Override

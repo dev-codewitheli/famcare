@@ -8,6 +8,7 @@ import com.codewitheli.famcare.application.port.in.ManageFamilyUseCase;
 import com.codewitheli.famcare.application.port.out.ArrivalNoticeRepository;
 import com.codewitheli.famcare.application.port.out.DeviceRepository;
 import com.codewitheli.famcare.application.port.out.FamilyRepository;
+import com.codewitheli.famcare.application.port.out.GateAlertRepository;
 import com.codewitheli.famcare.application.port.out.MemberRepository;
 import com.codewitheli.famcare.application.port.out.PushMessage;
 import com.codewitheli.famcare.domain.model.Family;
@@ -29,18 +30,20 @@ public class FamilyService implements ManageFamilyUseCase {
     private final MemberRepository members;
     private final DeviceRepository devices;
     private final ArrivalNoticeRepository arrivals;
+    private final GateAlertRepository gateAlerts;
     private final FamilyNotifier notifier;
     private final MemberLookup memberLookup;
     private final InviteCodeGenerator inviteCodes;
     private final Clock clock;
 
     FamilyService(FamilyRepository families, MemberRepository members, DeviceRepository devices,
-                  ArrivalNoticeRepository arrivals, FamilyNotifier notifier, MemberLookup memberLookup,
-                  InviteCodeGenerator inviteCodes, Clock clock) {
+                  ArrivalNoticeRepository arrivals, GateAlertRepository gateAlerts, FamilyNotifier notifier,
+                  MemberLookup memberLookup, InviteCodeGenerator inviteCodes, Clock clock) {
         this.families = families;
         this.members = members;
         this.devices = devices;
         this.arrivals = arrivals;
+        this.gateAlerts = gateAlerts;
         this.notifier = notifier;
         this.memberLookup = memberLookup;
         this.inviteCodes = inviteCodes;
@@ -94,6 +97,7 @@ public class FamilyService implements ManageFamilyUseCase {
     /**
      * Takes a member out of their family: no more rings or heads-ups. If they set the family up,
      * the longest-standing remaining member takes over, so the family is never left without one.
+     * When the last member goes, the family goes too: its name, invite code, and all its activity.
      *
      * @param anonymize also replace their nickname in past activity (account deletion, see AccountService)
      */
@@ -108,6 +112,18 @@ public class FamilyService implements ManageFamilyUseCase {
         arrivals.deleteByMember(member.id());
         devices.deleteByMember(member.id());
         members.markRemoved(member.id(), clock.instant(), anonymize);
+        if (members.findByFamilyId(member.familyId()).isEmpty()) {
+            deleteFamily(member.familyId());
+        }
+    }
+
+    /** Nobody is left to see it, so nothing is kept, and the old invite code stops working. */
+    private void deleteFamily(UUID familyId) {
+        gateAlerts.deleteByFamily(familyId);
+        arrivals.deleteByFamily(familyId);
+        devices.deleteByFamily(familyId);
+        members.deleteByFamily(familyId);
+        families.deleteById(familyId);
     }
 
     private Member requireCreator(AuthenticatedUser user) {

@@ -14,7 +14,8 @@ Built with **Flutter** (Android) + a little **Kotlin**, **Java 21 + Spring Boot 
 **hexagonal architecture** as [JobLens](https://github.com/dev-codewitheli/joblens).
 
 > **Privacy by design:** the server stores a nickname and a random sign-in ID per person, and
-> deletes gate activity after 90 days. Screenshots use a made-up family.
+> deletes gate activity after 90 days. When the last member leaves, the whole family is deleted.
+> Screenshots use a made-up family.
 > [Privacy policy](https://dev-codewitheli.github.io/homebell/privacy.html)
 
 ---

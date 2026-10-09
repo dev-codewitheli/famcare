@@ -404,6 +404,68 @@ class GateAlertFlowTest {
     }
 
     @Test
+    void whenTheLastMemberLeavesTheFamilyIsDeleted() {
+        var inviteCode = inviteCode("ate");
+        withActivity();
+        leave("papa");
+        leave("mama");
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate"))
+                .hasStatusOk();   // not last yet: the family stays
+
+        leave("ate");
+
+        assertThat(mvc.post().uri("/api/families/join").header("Authorization", "Bearer kuya")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"inviteCode\": \"%s\", \"displayName\": \"Kuya\"}".formatted(inviteCode)))
+                .hasStatus(404);
+        assertThat(mvc.post().uri("/api/families").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"familyName": "Centeno", "displayName": "Ate"}""")
+                .exchange())
+                .hasStatus(201)
+                .bodyJson().extractingPath("$.members[*].displayName").asArray().containsExactly("Ate");
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$").asArray().isEmpty();
+    }
+
+    @Test
+    void whenTheLastMemberDeletesTheirAccountTheFamilyIsDeleted() {
+        var inviteCode = inviteCode("ate");
+        withActivity();
+        leave("papa");
+        leave("mama");
+
+        assertThat(mvc.delete().uri("/api/account").header("Authorization", "Bearer ate")).hasStatus(204);
+
+        assertThat(mvc.post().uri("/api/families/join").header("Authorization", "Bearer kuya")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"inviteCode\": \"%s\", \"displayName\": \"Kuya\"}".formatted(inviteCode)))
+                .hasStatus(404);
+        assertThat(mvc.post().uri("/api/families").header("Authorization", "Bearer ate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"familyName": "Centeno", "displayName": "Ate"}"""))
+                .hasStatus(201);
+    }
+
+    @Test
+    void aMemberLeavingKeepsTheFamilyAndItsInviteCode() {
+        var inviteCode = inviteCode("ate");
+        withActivity();
+
+        leave("ate");
+        leave("papa");
+
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer mama"))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.inviteCode").isEqualTo(inviteCode);
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer mama"))
+                .bodyJson().extractingPath("$").asArray().hasSize(2);
+        joinAs("kuya", "Kuya", inviteCode);
+    }
+
+    @Test
     void whenTheCreatorLeavesTheLongestStandingMemberTakesOver() {
         assertThat(mvc.post().uri("/api/families/mine/leave").header("Authorization", "Bearer ate")).hasStatus(204);
 
@@ -485,6 +547,26 @@ class GateAlertFlowTest {
         var result = mvc.post().uri("/api/gate-alerts").header("Authorization", "Bearer " + user).exchange();
         assertThat(result).hasStatusOk();
         return JsonPath.read(body(result), "$.id");
+    }
+
+    /** Something of everything a family owns: finished and ringing alerts, a seen heads-up. */
+    private void withActivity() {
+        var answered = ring("papa");
+        mvc.post().uri("/api/gate-alerts/{id}/acknowledge", answered).header("Authorization", "Bearer ate").exchange();
+        String noticeId = JsonPath.read(body(announce("mama", 10).exchange()), "$.id");
+        mvc.post().uri("/api/arrivals/{id}/seen", noticeId).header("Authorization", "Bearer ate").exchange();
+        ring("ate");
+        announce("ate", 5).exchange();
+    }
+
+    private void leave(String user) {
+        assertThat(mvc.post().uri("/api/families/mine/leave").header("Authorization", "Bearer " + user))
+                .hasStatus(204);
+    }
+
+    private String inviteCode(String user) {
+        return JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer " + user)
+                .exchange()), "$.inviteCode");
     }
 
     private String memberId(String displayName) {

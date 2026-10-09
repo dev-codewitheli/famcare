@@ -25,4 +25,7 @@ public interface MemberRepository {
      * @param anonymize also replace the nickname past activity shows (account deletion)
      */
     void markRemoved(UUID memberId, Instant now, boolean anonymize);
+
+    /** Hard delete of everyone who was ever in the family, removed members included. */
+    void deleteByFamily(UUID familyId);
 }

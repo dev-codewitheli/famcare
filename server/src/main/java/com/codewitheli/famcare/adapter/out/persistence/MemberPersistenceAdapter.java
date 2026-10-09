@@ -3,6 +3,8 @@ package com.codewitheli.famcare.adapter.out.persistence;
 import com.codewitheli.famcare.application.port.out.MemberRepository;
 import com.codewitheli.famcare.domain.model.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -17,6 +19,10 @@ class MemberPersistenceAdapter implements MemberRepository {
         Optional<MemberEntity> findByAuthUidAndRemovedAtIsNull(String authUid);
 
         List<MemberEntity> findByFamilyIdAndRemovedAtIsNullOrderByJoinedAt(UUID familyId);
+
+        @Modifying(flushAutomatically = true, clearAutomatically = true)
+        @Query("delete from MemberEntity m where m.familyId = :familyId")
+        void deleteByFamilyId(UUID familyId);
     }
 
     private final Jpa jpa;
@@ -53,5 +59,10 @@ class MemberPersistenceAdapter implements MemberRepository {
             entity.markRemoved(now, anonymize);
             jpa.save(entity);
         });
+    }
+
+    @Override
+    public void deleteByFamily(UUID familyId) {
+        jpa.deleteByFamilyId(familyId);
     }
 }

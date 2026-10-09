@@ -21,4 +21,7 @@ public interface GateAlertRepository {
 
     /** Retention: finished alerts created before the cutoff. Returns how many were deleted. */
     int deleteFinishedCreatedBefore(Instant cutoff);
+
+    /** Ringing ones too. */
+    void deleteByFamily(UUID familyId);
 }
