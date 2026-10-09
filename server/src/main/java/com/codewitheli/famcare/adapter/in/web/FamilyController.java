@@ -65,6 +65,19 @@ class FamilyController {
         return FamilyResponse.from(families.renameMe(user, request.displayName()));
     }
 
+    /** Leave the family; the creator's role passes to the longest-standing member. */
+    @PostMapping("/mine/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void leave(@AuthenticationPrincipal AuthenticatedUser user) {
+        families.leave(user);
+    }
+
+    /** Family creator only: replaces the invite code. */
+    @PostMapping("/mine/invite-code")
+    FamilyResponse resetInviteCode(@AuthenticationPrincipal AuthenticatedUser user) {
+        return FamilyResponse.from(families.resetInviteCode(user));
+    }
+
     /** Family creator only (403 otherwise); can't remove themselves. */
     @DeleteMapping("/mine/members/{memberId}")
     FamilyResponse removeMember(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID memberId) {

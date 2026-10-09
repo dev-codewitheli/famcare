@@ -13,4 +13,7 @@ public interface DeviceRepository {
     void deleteTokens(Collection<String> pushTokens);
 
     void deleteByMember(UUID memberId);
+
+    /** Removes the token only if it's registered to that member. */
+    void deleteToken(UUID memberId, String pushToken);
 }

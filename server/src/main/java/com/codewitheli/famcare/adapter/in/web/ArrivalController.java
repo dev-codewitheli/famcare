@@ -7,6 +7,7 @@ import com.codewitheli.famcare.application.port.in.ArrivalUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,6 +40,13 @@ class ArrivalController {
     @GetMapping("/active")
     List<ArrivalResponse> active(@AuthenticationPrincipal AuthenticatedUser user) {
         return arrivals.active(user).stream().map(ArrivalResponse::from).toList();
+    }
+
+    /** "I'm not coming after all." */
+    @DeleteMapping("/mine")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void cancel(@AuthenticationPrincipal AuthenticatedUser user) {
+        arrivals.cancelMine(user);
     }
 
     /** "Got it": lets the person on their way know someone saw their heads-up. */

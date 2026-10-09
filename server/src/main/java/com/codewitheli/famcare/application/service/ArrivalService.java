@@ -72,6 +72,20 @@ public class ArrivalService implements ArrivalUseCase {
     }
 
     @Override
+    public void cancelMine(AuthenticatedUser user) {
+        var me = memberLookup.require(user);
+        var now = clock.instant();
+        var hadActive = notices.findByFamilyCreatedSince(me.familyId(), ArrivalNotice.oldestActiveCreatedAt(now))
+                .stream()
+                .anyMatch(n -> n.memberId().equals(me.id()) && n.isActive(now));
+        notices.deleteByMember(me.id());
+        if (hadActive) {
+            // Their "on the way" card and notification go away.
+            notifier.notifyOthers(me, PushMessage.ARRIVAL_CANCELLED, Map.of("senderName", me.displayName()));
+        }
+    }
+
+    @Override
     public ArrivalView markSeen(AuthenticatedUser user, UUID noticeId) {
         var me = memberLookup.require(user);
         var notice = notices.findById(noticeId)

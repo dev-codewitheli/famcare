@@ -32,9 +32,12 @@ class MemberEntity {
      * auth_uid is unique, so it's released (replaced with a placeholder) to let the same Google
      * account join a family again later.
      */
-    void markRemoved(Instant now) {
+    void markRemoved(Instant now, boolean anonymize) {
         removedAt = now;
         authUid = "removed:" + id;
+        if (anonymize) {
+            displayName = "Former member";
+        }
     }
 
     static MemberEntity from(Member member) {

@@ -22,6 +22,8 @@ public record PushMessage(String type, Map<String, String> data, Duration timeTo
     public static final String ARRIVAL_SEEN = "ARRIVAL_SEEN";
     /** To the sender: "Time's up — are you at the gate?" */
     public static final String ARRIVAL_DUE = "ARRIVAL_DUE";
+    /** To the rest of the family: the sender cancelled their heads-up. */
+    public static final String ARRIVAL_CANCELLED = "ARRIVAL_CANCELLED";
     /** To someone removed from the family, so their app goes back to the join screen. */
     public static final String MEMBER_REMOVED = "MEMBER_REMOVED";
 }

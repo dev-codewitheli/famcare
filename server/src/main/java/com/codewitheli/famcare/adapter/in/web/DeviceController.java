@@ -6,6 +6,7 @@ import com.codewitheli.famcare.application.port.in.RegisterDeviceUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,5 +29,13 @@ class DeviceController {
     void register(@AuthenticationPrincipal AuthenticatedUser user,
                   @Valid @RequestBody RegisterDeviceRequest request) {
         devices.registerDevice(user, request.pushToken());
+    }
+
+    /** On sign-out, so a signed-out phone stops ringing. (POST: some clients drop DELETE bodies.) */
+    @PostMapping("/unregister")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void unregister(@AuthenticationPrincipal AuthenticatedUser user,
+                    @Valid @RequestBody RegisterDeviceRequest request) {
+        devices.unregisterDevice(user, request.pushToken());
     }
 }

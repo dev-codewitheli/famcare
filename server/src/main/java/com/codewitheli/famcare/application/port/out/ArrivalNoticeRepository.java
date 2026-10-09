@@ -26,6 +26,9 @@ public interface ArrivalNoticeRepository {
     /** Idempotent: tapping "Got it" twice counts once. */
     void markSeen(UUID noticeId, UUID memberId, Instant now);
 
+    /** Retention: notices created before the cutoff (long expired). Returns how many were deleted. */
+    int deleteCreatedBefore(Instant cutoff);
+
     /** Who has seen each notice, in the order they tapped "Got it". */
     Map<UUID, List<UUID>> seenBy(Collection<UUID> noticeIds);
 }

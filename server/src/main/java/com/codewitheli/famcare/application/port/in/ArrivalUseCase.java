@@ -14,6 +14,9 @@ public interface ArrivalUseCase {
     /** Who's on their way right now, soonest first. */
     List<ArrivalView> active(AuthenticatedUser user);
 
+    /** "I'm not coming after all": removes my heads-up for everyone. No-op if there isn't one. */
+    void cancelMine(AuthenticatedUser user);
+
     /** "Got it": the sender is told who has seen their heads-up. */
     ArrivalView markSeen(AuthenticatedUser user, UUID noticeId);
 

@@ -19,6 +19,10 @@ public interface MemberRepository {
     /** Current members only, in joining order. */
     List<Member> findByFamilyId(UUID familyId);
 
-    /** Soft delete: frees their sign-in to join (or rejoin) a family later. */
-    void markRemoved(UUID memberId, Instant now);
+    /**
+     * Soft delete: frees their sign-in to join (or rejoin) a family later.
+     *
+     * @param anonymize also replace the nickname past activity shows (account deletion)
+     */
+    void markRemoved(UUID memberId, Instant now, boolean anonymize);
 }

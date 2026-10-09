@@ -5,8 +5,11 @@ import com.codewitheli.famcare.domain.model.GateAlert;
 import com.codewitheli.famcare.domain.model.GateAlertStatus;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +24,10 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
         List<GateAlertEntity> findByStatus(GateAlertStatus status);
 
         List<GateAlertEntity> findByFamilyIdOrderByCreatedAtDesc(UUID familyId, Limit limit);
+
+        @Modifying
+        @Query("delete from GateAlertEntity a where a.createdAt < :cutoff and a.status <> :ringing")
+        int deleteCreatedBefore(Instant cutoff, GateAlertStatus ringing);
     }
 
     private final Jpa jpa;
@@ -48,6 +55,11 @@ class GateAlertPersistenceAdapter implements GateAlertRepository {
     @Override
     public List<GateAlert> findAllRinging() {
         return jpa.findByStatus(GateAlertStatus.RINGING).stream().map(GateAlertEntity::toDomain).toList();
+    }
+
+    @Override
+    public int deleteFinishedCreatedBefore(Instant cutoff) {
+        return jpa.deleteCreatedBefore(cutoff, GateAlertStatus.RINGING);
     }
 
     @Override

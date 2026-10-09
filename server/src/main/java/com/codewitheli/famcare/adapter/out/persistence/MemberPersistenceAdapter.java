@@ -48,9 +48,9 @@ class MemberPersistenceAdapter implements MemberRepository {
     }
 
     @Override
-    public void markRemoved(UUID memberId, Instant now) {
+    public void markRemoved(UUID memberId, Instant now, boolean anonymize) {
         jpa.findById(memberId).ifPresent(entity -> {
-            entity.markRemoved(now);
+            entity.markRemoved(now, anonymize);
             jpa.save(entity);
         });
     }

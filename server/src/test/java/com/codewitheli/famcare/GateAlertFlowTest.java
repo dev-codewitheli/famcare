@@ -2,6 +2,7 @@ package com.codewitheli.famcare;
 
 import com.codewitheli.famcare.application.port.in.ArrivalUseCase;
 import com.codewitheli.famcare.application.port.in.GateAlertUseCase;
+import com.codewitheli.famcare.application.port.in.RetentionUseCase;
 import com.codewitheli.famcare.application.port.out.PushMessage;
 import com.codewitheli.famcare.application.port.out.PushNotifier;
 import com.jayway.jsonpath.JsonPath;
@@ -50,6 +51,8 @@ class GateAlertFlowTest {
     GateAlertUseCase gateAlerts;
     @Autowired
     ArrivalUseCase arrivals;
+    @Autowired
+    RetentionUseCase retention;
 
     @BeforeEach
     void setUpFamily() {
@@ -330,6 +333,104 @@ class GateAlertFlowTest {
                 .exchange()), "$.me.id");
         assertThat(mvc.delete().uri("/api/families/mine/members/{id}", ateId).header("Authorization", "Bearer ate"))
                 .hasStatus(409);
+    }
+
+    @Test
+    void cancellingAHeadsUpClearsItForEveryoneOnce() {
+        announce("ate", 10).exchange();
+
+        assertThat(mvc.delete().uri("/api/arrivals/mine").header("Authorization", "Bearer ate")).hasStatus(204);
+        var cancelled = pushes.last();
+        assertThat(cancelled.message().type()).isEqualTo(PushMessage.ARRIVAL_CANCELLED);
+        assertThat(cancelled.tokens()).containsExactlyInAnyOrder("token-papa", "token-mama");
+        assertThat(mvc.get().uri("/api/arrivals/active").header("Authorization", "Bearer papa"))
+                .bodyJson().extractingPath("$").asArray().isEmpty();
+
+        var pushesSoFar = pushes.sent.size();
+        assertThat(mvc.delete().uri("/api/arrivals/mine").header("Authorization", "Bearer ate")).hasStatus(204);
+        assertThat(pushes.sent).hasSize(pushesSoFar);
+    }
+
+    @Test
+    void aMemberCanLeave() {
+        assertThat(mvc.post().uri("/api/families/mine/leave").header("Authorization", "Bearer papa")).hasStatus(204);
+
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer papa")).hasStatus(409);
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$.members[*].displayName").asArray().containsExactly("Ate", "Mama");
+    }
+
+    @Test
+    void whenTheCreatorLeavesTheLongestStandingMemberTakesOver() {
+        assertThat(mvc.post().uri("/api/families/mine/leave").header("Authorization", "Bearer ate")).hasStatus(204);
+
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer papa"))
+                .bodyJson().extractingPath("$.me.role").isEqualTo("PARENT");
+        assertThat(mvc.patch().uri("/api/families/mine").header("Authorization", "Bearer papa")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"familyName\": \"Papa's\"}"))
+                .hasStatusOk();
+    }
+
+    @Test
+    void creatorCanResetTheInviteCode() {
+        String oldCode = JsonPath.read(body(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer ate")
+                .exchange()), "$.inviteCode");
+
+        assertThat(mvc.post().uri("/api/families/mine/invite-code").header("Authorization", "Bearer papa"))
+                .hasStatus(403);
+        String newCode = JsonPath.read(body(mvc.post().uri("/api/families/mine/invite-code")
+                .header("Authorization", "Bearer ate").exchange()), "$.inviteCode");
+
+        assertThat(newCode).isNotEqualTo(oldCode);
+        assertThat(mvc.post().uri("/api/families/join").header("Authorization", "Bearer kuya")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"inviteCode\": \"%s\", \"displayName\": \"Kuya\"}".formatted(oldCode)))
+                .hasStatus(404);
+        joinAs("kuya", "Kuya", newCode);
+    }
+
+    @Test
+    void aSignedOutPhoneStopsRinging() {
+        assertThat(mvc.post().uri("/api/devices/unregister").header("Authorization", "Bearer papa")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"pushToken\": \"token-papa\"}"))
+                .hasStatus(204);
+        // Someone else's token is left alone.
+        mvc.post().uri("/api/devices/unregister").header("Authorization", "Bearer papa")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"pushToken\": \"token-mama\"}").exchange();
+
+        ring("ate");
+        assertThat(pushes.last().tokens()).containsExactly("token-mama");
+    }
+
+    @Test
+    void deletingAnAccountRemovesThePersonAndAnonymizesTheirHistory() {
+        var mamasRing = ring("mama");
+        mvc.post().uri("/api/gate-alerts/{id}/cancel", mamasRing).header("Authorization", "Bearer mama").exchange();
+
+        assertThat(mvc.delete().uri("/api/account").header("Authorization", "Bearer mama")).hasStatus(204);
+
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer mama")).hasStatus(409);
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$[0].sender.displayName").isEqualTo("Former member");
+        ring("ate");
+        assertThat(pushes.last().tokens()).containsExactly("token-papa");
+    }
+
+    @Test
+    void retentionKeepsNinetyDaysOfGateActivity() {
+        var old = ring("ate");
+        mvc.post().uri("/api/gate-alerts/{id}/cancel", old).header("Authorization", "Bearer ate").exchange();
+        announce("papa", 5).exchange();
+
+        clock.advance(Duration.ofDays(89));
+        retention.purgeOldActivity();
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$").asArray().hasSize(1);
+
+        clock.advance(Duration.ofDays(2));
+        retention.purgeOldActivity();
+        assertThat(mvc.get().uri("/api/gate-alerts/recent").header("Authorization", "Bearer ate"))
+                .bodyJson().extractingPath("$").asArray().isEmpty();
     }
 
     private MockMvcTester.MockMvcRequestBuilder announce(String user, int minutes) {

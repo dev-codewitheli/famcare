@@ -74,10 +74,40 @@ public class FamilyService implements ManageFamilyUseCase {
                 .orElseThrow(() -> new NotFoundException("Member not found"));
         // Tell their phone first (while it's still registered), then cut them off.
         notifier.notifyMember(member.familyId(), member.id(), PushMessage.MEMBER_REMOVED, Map.of());
+        depart(member, false);
+        return myFamily(user);
+    }
+
+    @Override
+    public void leave(AuthenticatedUser user) {
+        depart(memberLookup.require(user), false);
+    }
+
+    @Override
+    public FamilyView resetInviteCode(AuthenticatedUser user) {
+        var me = requireCreator(user);
+        var family = families.findById(me.familyId()).orElseThrow();
+        families.save(new Family(family.id(), family.name(), uniqueInviteCode(), family.createdAt()));
+        return myFamily(user);
+    }
+
+    /**
+     * Takes a member out of their family: no more rings or heads-ups. If they set the family up,
+     * the longest-standing remaining member takes over, so the family is never left without one.
+     *
+     * @param anonymize also replace their nickname in past activity (account deletion, see AccountService)
+     */
+    void depart(Member member, boolean anonymize) {
+        if (member.role() == MemberRole.PARENT) {
+            members.findByFamilyId(member.familyId()).stream()
+                    .filter(m -> !m.id().equals(member.id()))
+                    .findFirst() // joining order
+                    .ifPresent(next -> members.save(new Member(next.id(), next.familyId(), next.authUid(),
+                            next.displayName(), MemberRole.PARENT, next.joinedAt())));
+        }
         arrivals.deleteByMember(member.id());
         devices.deleteByMember(member.id());
-        members.markRemoved(member.id(), clock.instant());
-        return myFamily(user);
+        members.markRemoved(member.id(), clock.instant(), anonymize);
     }
 
     private Member requireCreator(AuthenticatedUser user) {
