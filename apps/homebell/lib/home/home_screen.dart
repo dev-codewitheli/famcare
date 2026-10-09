@@ -138,14 +138,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       return _activity.refresh();
     }
-    // My "time's up" reminder: ring now, or add time.
+    // My "time's up" reminder: ring now, add time, or not coming.
     if (payload.startsWith(GateNotifications.duePayloadPrefix)) {
+      await GateNotifications.cancelDueReminder();
       if (action == GateNotifications.ringNowActionId) {
-        await GateNotifications.cancelDueReminder();
         await _ring();
       } else if (action == GateNotifications.addTimeActionId) {
-        await GateNotifications.cancelDueReminder();
         await _announce(GateNotifications.addTimeMinutes);
+      } else if (action == GateNotifications.notComingActionId) {
+        await _cancelHeadsUp();
       }
       return _activity.refresh();
     }
@@ -178,6 +179,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await GateNotifications.cancelDueReminder();
     await _gate.ring();
     await _activity.refresh();
+  }
+
+  Future<void> _cancelHeadsUp() async {
+    await GateNotifications.cancelDueReminder();
+    final error = await _activity.cancelMine();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error ?? 'Heads-up cancelled. The family was told you\'re not coming.'),
+    ));
   }
 
   Future<void> _announce(int minutes) async {
@@ -277,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       myArrival: _activity.myArrival,
                       busy: _activity.announcing || _gate.busy,
                       onAnnounce: _announce,
-                      onRingNow: _ring,
+                      onCancel: _cancelHeadsUp,
                     ),
                   ],
                   const SizedBox(height: 24),

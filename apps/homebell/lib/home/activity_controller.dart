@@ -63,6 +63,24 @@ class ActivityController extends ChangeNotifier {
     }
   }
 
+  /// "I'm not coming": removes my heads-up for everyone. Returns an error message, or null.
+  Future<String?> cancelMine() async {
+    _announcing = true;
+    notifyListeners();
+    try {
+      await api.cancelArrival();
+      _arrivals = _arrivals.where((a) => a.member.id != myMemberId).toList();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return "Can't reach the server. Check your connection.";
+    } finally {
+      _announcing = false;
+      notifyListeners();
+    }
+  }
+
   /// "Got it" on someone else's heads-up. Returns an error message, or null on success.
   Future<String?> markSeen(String noticeId) async {
     try {

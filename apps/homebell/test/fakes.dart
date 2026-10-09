@@ -76,6 +76,12 @@ class FakeGateApi implements GateApi {
   }
 
   @override
+  Future<void> cancelArrival() async {
+    if (failWith != null) throw failWith!;
+    activeArrivals = activeArrivals.where((a) => a.member.id != me.id).toList();
+  }
+
+  @override
   Future<Arrival> markArrivalSeen(String noticeId) async {
     if (failWith != null) throw failWith!;
     final a = activeArrivals.firstWhere((a) => a.id == noticeId);

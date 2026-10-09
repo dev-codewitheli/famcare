@@ -23,6 +23,16 @@ class FamilyApi {
 
   Future<void> registerDevice(String pushToken) => _api.put('/api/devices', {'pushToken': pushToken});
 
+  Future<void> unregisterDevice(String pushToken) =>
+      _api.post('/api/devices/unregister', {'pushToken': pushToken});
+
+  Future<void> leave() => _api.post('/api/families/mine/leave');
+
+  Future<Family> resetInviteCode() async => Family.fromJson(await _api.post('/api/families/mine/invite-code'));
+
+  /// Deletes the account and everything stored about it (and the Firebase sign-in).
+  Future<void> deleteAccount() => _api.delete('/api/account');
+
   Future<Family> renameMe(String displayName) async =>
       Family.fromJson(await _api.patch('/api/families/mine/me', {'displayName': displayName}));
 

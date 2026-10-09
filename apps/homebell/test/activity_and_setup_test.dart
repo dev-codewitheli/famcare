@@ -41,6 +41,17 @@ void main() {
       expect(activity.announcing, isFalse);
     });
 
+    test('"Not coming" removes my heads-up', () async {
+      await activity.announce(10);
+      expect(await activity.cancelMine(), isNull);
+      expect(activity.myArrival, isNull);
+      expect(activity.announcing, isFalse);
+    });
+
+    test('hidesAt is ten minutes after the expected arrival', () {
+      expect(arrival(me, 5).hidesAt, t0.add(const Duration(minutes: 15)));
+    });
+
     test('"Got it" marks someone else\'s heads-up as seen by me', () async {
       api.activeArrivals = [arrival(papa, 10)];
       await activity.refresh();

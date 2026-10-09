@@ -10,6 +10,7 @@ plugins {
 // and runs in demo mode (AUTH_MODE=demo); add it to enable sign-in and push.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 // Release signing key, also kept out of git (android/key.properties points at the keystore).

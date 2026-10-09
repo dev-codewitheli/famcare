@@ -76,6 +76,12 @@ class Arrival {
   /// The expected time has come: "are you at the gate?"
   bool isDue(DateTime now) => !now.isBefore(expectedAt);
 
+  /// The server drops a heads-up this long after the expected arrival.
+  static const grace = Duration(minutes: 10);
+
+  /// When the heads-up disappears on its own if nobody rings or cancels.
+  DateTime get hidesAt => expectedAt.add(grace);
+
   bool seenByMember(String memberId) => seenBy.any((m) => m.id == memberId);
 
   /// Whole minutes until the expected arrival; 0 once it's due.
@@ -116,6 +122,9 @@ class GateApi {
 
   Future<Arrival> announceArrival(int etaMinutes) async =>
       Arrival.fromJson(await _api.post('/api/arrivals', {'etaMinutes': etaMinutes}));
+
+  /// "I'm not coming after all": removes my heads-up for everyone.
+  Future<void> cancelArrival() => _api.delete('/api/arrivals/mine');
 
   /// "Got it": tells the person on their way that I saw their heads-up.
   Future<Arrival> markArrivalSeen(String noticeId) async =>

@@ -24,9 +24,17 @@ class PushRegistration {
     }
   }
 
+  /// Before signing out: this phone stops getting the family's pushes. Best effort (offline
+  /// sign-out still works; the server then drops the token the next time FCM rejects it).
   Future<void> stop() async {
     await _refreshes?.cancel();
     _refreshes = null;
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await _familyApi.unregisterDevice(token);
+    } catch (e) {
+      debugPrint('Push token unregistration failed: $e');
+    }
   }
 
   Future<void> _register(String token) async {

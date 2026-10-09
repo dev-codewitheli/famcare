@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../gate/gate_notifications.dart';
 import '../gate/ring_settings.dart';
+import '../links.dart';
 import '../setup/device_settings.dart';
 import '../setup/phone_setup.dart';
 import '../setup/setup_screen.dart';
@@ -173,12 +174,53 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                       .push(MaterialPageRoute(builder: (_) => FamilyScreen(session: widget.session))),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.exit_to_app_rounded),
+                  title: const Text('Leave family'),
+                  subtitle: widget.session.isCreator
+                      ? const Text('The next longest-standing member will manage the family')
+                      : null,
+                  onTap: _leaveFamily,
+                ),
+              ],
+            ),
+          ),
+          _SectionTitle('Account'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
                   leading: const Icon(Icons.logout_rounded),
                   title: const Text('Sign out'),
+                  subtitle: const Text('This phone stops getting rings until you sign back in'),
                   onTap: () {
                     Navigator.of(context).popUntil((route) => route.isFirst);
                     widget.session.signOut();
                   },
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_forever_rounded, color: colors.error),
+                  title: Text('Delete my account', style: TextStyle(color: colors.error)),
+                  onTap: _deleteAccount,
+                ),
+              ],
+            ),
+          ),
+          _SectionTitle('About'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_rounded),
+                  title: const Text('Privacy policy'),
+                  trailing: const Icon(Icons.open_in_new_rounded),
+                  onTap: () => Links.open(Links.privacyPolicy),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.code_rounded),
+                  title: const Text('Source code'),
+                  subtitle: const Text('HomeBell is open source'),
+                  trailing: const Icon(Icons.open_in_new_rounded),
+                  onTap: () => Links.open(Links.sourceCode),
                 ),
               ],
             ),
@@ -187,6 +229,65 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       ),
     );
   }
+
+  Future<void> _leaveFamily() async {
+    final confirmed = await _confirm(
+      icon: Icons.exit_to_app_rounded,
+      title: 'Leave ${widget.session.family?.name ?? 'the family'}?',
+      message: 'You\'ll stop getting gate rings and heads-ups. You can join again with an invite code.',
+      action: 'Leave',
+    );
+    if (confirmed != true || !mounted) return;
+    await _attempt(() async {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      await widget.session.leaveFamily();
+    });
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await _confirm(
+      icon: Icons.delete_forever_rounded,
+      title: 'Delete your account?',
+      message: 'This removes you from the family, forgets this phone, replaces your nickname in past '
+          'activity with "Former member", and deletes your HomeBell sign-in. It can\'t be undone.',
+      action: 'Delete account',
+    );
+    if (confirmed != true || !mounted) return;
+    await _attempt(() async {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      await widget.session.deleteAccount();
+    });
+  }
+
+  Future<void> _attempt(Future<void> Function() action) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text("Can't reach the server. Check your connection.")));
+    }
+  }
+
+  Future<bool?> _confirm(
+          {required IconData icon, required String title, required String message, required String action}) =>
+      showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: Icon(icon),
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      );
 }
 
 class _SectionTitle extends StatelessWidget {

@@ -71,6 +71,24 @@ class _FamilyView extends StatelessWidget {
     }
   }
 
+  Future<void> _resetCode(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.refresh_rounded),
+        title: const Text('Get a new invite code?'),
+        content: const Text('The current code stops working. Members already in the family stay in.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('New code')),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await _attempt(context, session.resetInviteCode, done: 'New invite code ready');
+    }
+  }
+
   static Future<void> _attempt(BuildContext context, Future<void> Function() action, {required String done}) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -143,6 +161,15 @@ class _FamilyView extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text('Share it with family members so they can join from their phones.',
                         style: theme.textTheme.bodySmall),
+                    if (isCreator)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => _resetCode(context),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Get a new code'),
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -20,10 +20,21 @@ class HomeBellApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: FamilyTheme.light(_brand),
       darkTheme: FamilyTheme.dark(_brand),
+      // Phones fill the screen; on tablets, keep a readable column instead of stretching.
+      builder: (context, child) => ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: Center(
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: child),
+        ),
+      ),
       home: ListenableBuilder(
         listenable: session,
         builder: (context, _) => switch (session.status) {
-          SessionStatus.loading => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          // Continues the native splash (orange, white bell) while the session loads.
+          SessionStatus.loading => const Scaffold(
+              backgroundColor: _brand,
+              body: Center(child: Icon(Icons.notifications_active_rounded, size: 96, color: Colors.white)),
+            ),
           SessionStatus.signedOut => SignInScreen(
               session: session,
               appName: 'HomeBell',

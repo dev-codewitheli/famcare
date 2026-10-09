@@ -376,30 +376,37 @@ class OnTheWayCard extends StatelessWidget {
   }
 }
 
-/// "Not home yet?" Tell the family roughly when you'll arrive; when the time is up, ring or
-/// add time if you're delayed.
+/// "On your way home?" Three states:
+/// - no heads-up: pick an ETA;
+/// - on the way: when the family expects you, who saw it, change the ETA or cancel;
+/// - time's up: running late (+5 / +10) or not coming. Ringing is the big button above, so
+///   the card doesn't repeat it. If ignored, it disappears on its own after the grace period.
 class OnMyWayCard extends StatelessWidget {
   const OnMyWayCard({
     super.key,
     required this.myArrival,
     required this.busy,
     required this.onAnnounce,
-    required this.onRingNow,
+    required this.onCancel,
   });
 
   final Arrival? myArrival;
   final bool busy;
   final ValueChanged<int> onAnnounce;
-  final VoidCallback onRingNow;
+  final VoidCallback onCancel;
 
-  static const _options = [5, 10, 15, 30];
+  static const _etaOptions = [5, 10, 15, 30];
   static const _delayOptions = [5, 10];
 
   @override
   Widget build(BuildContext context) {
     final mine = myArrival;
-    if (mine != null && mine.isDue(DateTime.now())) return _timesUp(context, mine);
+    if (mine == null) return _pickEta(context);
+    if (mine.isDue(DateTime.now())) return _timesUp(context, mine);
+    return _onTheWay(context, mine);
+  }
 
+  Widget _pickEta(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       child: Padding(
@@ -407,39 +414,36 @@ class OnMyWayCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.directions_car_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 10),
-                Text('On your way home?', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              ],
+            _Header(icon: Icons.directions_car_rounded, title: 'On your way home?'),
+            const SizedBox(height: 6),
+            Text('Give the family a heads-up so someone can head to the gate before you arrive. '
+                'We\'ll remind you when the time is up.', style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            _chips(_etaOptions, (m) => '~$m min', Icons.schedule_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _onTheWay(BuildContext context, Arrival mine) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Header(
+              icon: Icons.directions_car_rounded,
+              title: 'You\'re on your way',
+              trailing: _cancelButton(),
             ),
             const SizedBox(height: 6),
-            Text(
-              mine == null
-                  ? 'Give the family a heads-up so someone can head to the gate before you arrive. '
-                      'We\'ll remind you when the time is up.'
-                  : 'You told the family you\'d arrive around ${formatClock(context, mine.expectedAt)}. '
-                      'Tap a time to update it.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            if (mine != null) ...[
-              const SizedBox(height: 8),
-              _SeenBy(arrival: mine),
-            ],
+            Text('The family expects you around ${formatClock(context, mine.expectedAt)}.'),
+            const SizedBox(height: 8),
+            _SeenBy(arrival: mine),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final minutes in _options)
-                  ActionChip(
-                    avatar: const Icon(Icons.schedule_rounded, size: 18),
-                    label: Text('~$minutes min'),
-                    onPressed: busy ? null : () => onAnnounce(minutes),
-                  ),
-              ],
-            ),
+            _chips(_etaOptions, (m) => '~$m min', Icons.schedule_rounded),
           ],
         ),
       ),
@@ -456,48 +460,62 @@ class OnMyWayCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.alarm_rounded, color: colors.onTertiaryContainer),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text('Time\'s up. Are you at the gate?',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
+            _Header(icon: Icons.alarm_rounded, title: 'Time\'s up. At the gate?', trailing: _cancelButton()),
             const SizedBox(height: 6),
-            Text('You said you\'d arrive around ${formatClock(context, mine.expectedAt)}. '
-                'Running late? Add time and the family will be updated.'),
+            Text('Tap "I\'m at the gate" above when you arrive. Running late? Add time and the family '
+                'will be updated.'),
             const SizedBox(height: 8),
             _SeenBy(arrival: mine),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: busy ? null : onRingNow,
-                    icon: const Icon(Icons.notifications_active_rounded),
-                    label: const Text('I\'m at the gate'),
-                  ),
-                ),
-              ],
-            ),
+            _chips(_delayOptions, (m) => '+$m min', Icons.more_time_rounded),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final minutes in _delayOptions)
-                  ActionChip(
-                    avatar: const Icon(Icons.more_time_rounded, size: 18),
-                    label: Text('+$minutes min'),
-                    onPressed: busy ? null : () => onAnnounce(minutes),
-                  ),
-              ],
-            ),
+            Text('Hides on its own at ${formatClock(context, mine.hidesAt)}.',
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.onTertiaryContainer)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _cancelButton() => TextButton.icon(
+        onPressed: busy ? null : onCancel,
+        icon: const Icon(Icons.close_rounded, size: 18),
+        label: const Text('Not coming'),
+      );
+
+  Widget _chips(List<int> minutes, String Function(int) label, IconData icon) => Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final m in minutes)
+            ActionChip(
+              avatar: Icon(icon, size: 18),
+              label: Text(label(m)),
+              onPressed: busy ? null : () => onAnnounce(m),
+            ),
+        ],
+      );
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.icon, required this.title, this.trailing});
+
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, color: theme.colorScheme.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        ),
+        ?trailing,
+      ],
     );
   }
 }

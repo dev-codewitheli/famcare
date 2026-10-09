@@ -10,13 +10,16 @@ enum SessionStatus { loading, signedOut, needsFamily, ready, error }
 
 /// App-wide sign-in and family state. The apps route on [status].
 class Session extends ChangeNotifier {
-  Session({required this.auth, required this.familyApi, this.onReady});
+  Session({required this.auth, required this.familyApi, this.onReady, this.beforeSignOut});
 
   final AuthService auth;
   final FamilyApi familyApi;
 
   /// Runs each time the family loads, e.g. to register for pushes.
   final Future<void> Function(Family family)? onReady;
+
+  /// Runs while still signed in, e.g. so this phone stops getting the family's pushes.
+  final Future<void> Function()? beforeSignOut;
 
   SessionStatus _status = SessionStatus.loading;
   Family? _family;
@@ -75,6 +78,28 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    if (_family != null) await beforeSignOut?.call();
+    await _signOutLocally();
+  }
+
+  /// Leave the family but stay signed in (back to the join/create screen).
+  Future<void> leaveFamily() async {
+    await familyApi.leave();
+    await (await SharedPreferences.getInstance()).remove(_memberIdKey);
+    _family = null;
+    _set(SessionStatus.needsFamily);
+  }
+
+  /// Family creator only.
+  Future<void> resetInviteCode() async => _update(await familyApi.resetInviteCode());
+
+  /// Deletes the account on the server (which also forgets this phone), then signs out here.
+  Future<void> deleteAccount() async {
+    await familyApi.deleteAccount();
+    await _signOutLocally();
+  }
+
+  Future<void> _signOutLocally() async {
     await auth.signOut();
     await (await SharedPreferences.getInstance()).remove(_memberIdKey);
     _family = null;

@@ -16,6 +16,7 @@ class GateNotifications {
   static const gotItActionId = 'got_it';
   static const ringNowActionId = 'ring_now';
   static const addTimeActionId = 'add_time';
+  static const notComingActionId = 'not_coming';
 
   /// How much "+ time" the reminder's button adds.
   static const addTimeMinutes = 5;
@@ -43,7 +44,7 @@ class GateNotifications {
   static Future<void> init({bool inForeground = true}) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        android: AndroidInitializationSettings('ic_stat_bell'),
       ),
       onDidReceiveNotificationResponse: inForeground ? (r) => responses.value = r : null,
     );
@@ -116,6 +117,8 @@ class GateNotifications {
         return _showSeen(data);
       case 'ARRIVAL_DUE':
         return _showDue(data);
+      case 'ARRIVAL_CANCELLED':
+        return cancelHeadsUp(data['senderName'] as String? ?? '');
       case 'MEMBER_REMOVED':
         return _showUpdate('removed', 'You were removed from the family',
             'You won\'t get gate rings anymore. Ask for the invite code to join again.');
@@ -217,7 +220,8 @@ class GateNotifications {
     return _plugin.show(
       id: _id('due'),
       title: 'Time\'s up. Are you at the gate?',
-      body: 'Ring the family now, or add $addTimeMinutes minutes if you\'re running late.',
+      body: 'Ring the family, add $addTimeMinutes minutes if you\'re running late, or let them know '
+          'you\'re not coming.',
       payload: '$duePayloadPrefix${data['noticeId']}',
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -226,10 +230,14 @@ class GateNotifications {
           importance: Importance.high,
           priority: Priority.high,
           category: AndroidNotificationCategory.reminder,
+          // Three buttons fit; ringing from here saves opening the app at the gate.
           actions: [
-            AndroidNotificationAction(ringNowActionId, 'I\'m at the gate', showsUserInterface: true),
+            AndroidNotificationAction(ringNowActionId, 'I\'m here', showsUserInterface: true),
             AndroidNotificationAction(addTimeActionId, '+$addTimeMinutes min', showsUserInterface: true),
+            AndroidNotificationAction(notComingActionId, 'Not coming', showsUserInterface: true),
           ],
+          // Gone on its own once the heads-up expires.
+          timeoutAfter: 10 * 60 * 1000,
         ),
       ),
     );
