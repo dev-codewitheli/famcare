@@ -24,7 +24,9 @@ The workflow needs the same two files you keep locally (outside git), stored as 
 | `KEYSTORE_BASE64` | the release keystore (`C:\Users\Eli\secrets\homebell-release.jks`), base64-encoded |
 | `KEYSTORE_PASSWORD` | the `storePassword` value from `apps/homebell/android/key.properties` |
 
-Copy each value to the clipboard without printing it (PowerShell), then paste it into GitHub:
+Copy each value to the clipboard without printing it, then paste it into GitHub. Run these in
+PowerShell from the repository root. (`[IO.File]` resolves relative paths against the process
+folder, not PowerShell's location, hence `$PWD`.)
 
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("apps\homebell\android\app\google-services.json")) | Set-Clipboard
