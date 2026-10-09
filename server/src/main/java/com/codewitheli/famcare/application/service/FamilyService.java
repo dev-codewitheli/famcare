@@ -51,9 +51,11 @@ public class FamilyService implements ManageFamilyUseCase {
     }
 
     @Override
-    public FamilyView renameMe(AuthenticatedUser user, String displayName) {
+    public FamilyView updateMe(AuthenticatedUser user, String displayName, String avatar) {
         var me = memberLookup.require(user);
-        members.save(new Member(me.id(), me.familyId(), me.authUid(), displayName.trim(), me.role(), me.joinedAt()));
+        if (displayName != null) me = me.withDisplayName(displayName.trim());
+        if (avatar != null) me = me.withAvatar(avatar.isEmpty() ? null : avatar);
+        members.save(me);
         return myFamily(user);
     }
 
@@ -106,8 +108,7 @@ public class FamilyService implements ManageFamilyUseCase {
             members.findByFamilyId(member.familyId()).stream()
                     .filter(m -> !m.id().equals(member.id()))
                     .findFirst() // joining order
-                    .ifPresent(next -> members.save(new Member(next.id(), next.familyId(), next.authUid(),
-                            next.displayName(), MemberRole.PARENT, next.joinedAt())));
+                    .ifPresent(next -> members.save(next.withRole(MemberRole.PARENT)));
         }
         arrivals.deleteByMember(member.id());
         devices.deleteByMember(member.id());
@@ -162,7 +163,7 @@ public class FamilyService implements ManageFamilyUseCase {
 
     private void addMember(AuthenticatedUser user, Family family, String displayName, MemberRole role) {
         members.save(new Member(UUID.randomUUID(), family.id(), user.uid(), displayName.trim(), role,
-                clock.instant()));
+                clock.instant(), null));
     }
 
     private void requireNotInFamily(AuthenticatedUser user) {

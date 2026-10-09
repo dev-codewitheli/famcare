@@ -77,8 +77,9 @@ class Session extends ChangeNotifier {
   Future<void> joinFamily({required String inviteCode, required String displayName}) async =>
       _ready(await familyApi.join(inviteCode: inviteCode, displayName: displayName));
 
-  /// Change what the family calls me.
-  Future<void> renameMe(String displayName) async => _update(await familyApi.renameMe(displayName));
+  /// Change what the family calls me and/or my icon (an empty [avatar] goes back to my initial).
+  Future<void> updateMe({String? displayName, String? avatar}) async =>
+      _update(await familyApi.updateMe(displayName: displayName, avatar: avatar));
 
   /// Family creator only; the server answers 403 for anyone else.
   Future<void> renameFamily(String familyName) async => _update(await familyApi.renameFamily(familyName));

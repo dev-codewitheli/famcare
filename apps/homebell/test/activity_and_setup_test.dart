@@ -108,7 +108,7 @@ void main() {
 
     test('every brand gets the core Android steps first', () {
       for (final brand in PhoneBrand.values) {
-        expect(ids(brand).take(5), ['notifications', 'fullscreen', 'battery', 'alarm_volume', 'ring_channel']);
+        expect(ids(brand).take(4), ['notifications', 'fullscreen', 'battery', 'ring_sound']);
       }
     });
 
@@ -135,15 +135,23 @@ void main() {
 
     test('Xiaomi checks its hidden settings automatically', () {
       final steps = setupStepsFor(PhoneBrand.xiaomi);
-      expect(ids(PhoneBrand.xiaomi), contains('xiaomi_lock_screen'));
-      for (final id in ['autostart', 'xiaomi_lock_screen', 'ring_channel']) {
+      expect(ids(PhoneBrand.xiaomi), contains('xiaomi_popups'));
+      for (final id in ['autostart', 'xiaomi_popups', 'ring_sound']) {
         expect(steps.firstWhere((s) => s.id == id).check, isNotNull, reason: id);
+      }
+    });
+
+    test('every required step on Xiaomi, Samsung and stock Android is detected automatically', () {
+      for (final brand in [PhoneBrand.xiaomi, PhoneBrand.samsung, PhoneBrand.other]) {
+        for (final step in setupStepsFor(brand).where((s) => !s.optional)) {
+          expect(step.check, isNotNull, reason: '${brand.name}: ${step.id}');
+        }
       }
     });
 
     test('Samsung and stock Android have no required brand steps', () {
       for (final brand in [PhoneBrand.samsung, PhoneBrand.other]) {
-        expect(setupStepsFor(brand).skip(5).where((s) => !s.optional), isEmpty, reason: brand.name);
+        expect(setupStepsFor(brand).skip(4).where((s) => !s.optional), isEmpty, reason: brand.name);
       }
     });
 

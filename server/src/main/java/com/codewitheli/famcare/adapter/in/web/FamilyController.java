@@ -58,11 +58,11 @@ class FamilyController {
         return FamilyResponse.from(families.renameFamily(user, request.familyName()));
     }
 
-    /** Change what the family calls me. */
+    /** Change what the family calls me, and/or my icon. */
     @PatchMapping("/mine/me")
     FamilyResponse renameMe(@AuthenticationPrincipal AuthenticatedUser user,
                             @Valid @RequestBody RenameMeRequest request) {
-        return FamilyResponse.from(families.renameMe(user, request.displayName()));
+        return FamilyResponse.from(families.updateMe(user, request.displayName(), request.avatar()));
     }
 
     /** Leave the family; the creator's role passes to the longest-standing member. */

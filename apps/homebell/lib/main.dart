@@ -9,10 +9,12 @@ import 'app.dart';
 import 'gate/gate_api.dart';
 import 'gate/gate_notifications.dart';
 import 'gate/gate_push_handler.dart';
+import 'settings/theme_preference.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final config = AppConfig.fromEnvironment();
+  await ThemePreference.instance.load();
   try {
     await GateNotifications.init();
   } catch (error) {

@@ -13,9 +13,9 @@ Built with **Flutter** (Android) + a little **Kotlin**, **Java 21 + Spring Boot 
 **PostgreSQL**, and **Firebase** (Authentication, Cloud Messaging, Crashlytics), using the same
 **hexagonal architecture** as [JobLens](https://github.com/dev-codewitheli/joblens).
 
-> **Privacy by design:** the server stores a nickname and a random sign-in ID per person, and
-> deletes gate activity after 90 days.
-> Screenshots use a made-up family.
+> **Privacy by design:** the server stores a nickname, an optional family-role icon (no photos)
+> and a random sign-in ID per person. It deletes gate activity after 90 days, and a whole family
+> once its last member leaves. Screenshots use a made-up family.
 > [Privacy policy](https://dev-codewitheli.github.io/homebell/privacy.html)
 
 ---
@@ -31,12 +31,13 @@ Built with **Flutter** (Android) + a little **Kotlin**, **Java 21 + Spring Boot 
 4. If nobody answers, it rings again every 30 s, up to 4 times, then tells the sender
    *"Nobody answered, try calling."*
 
-**Not home yet?** Send an **"On my way (~5/10/15/30 min)"** heads-up. The family can tap
-**Got it** (you see *"Seen by Papa"*), and when your time is up HomeBell asks **"At the gate?"**
-with **+5 / +10 min** or **Not coming**.
+**Not home yet?** Send an **"On my way"** heads-up: ~5, 10, 15 or 30 min, or any time up to an
+hour. The family can tap **Got it** (you see *"Seen by Papa"*), and when your time is up HomeBell
+asks **"At the gate?"** with **+5 / +10 min** (or more) or **Not coming**.
 
-Also: recent activity, editable nicknames, family management (rename, remove members, new
-invite code, leave), in-app account deletion, and an optional per-phone
+Also: recent activity, nicknames with a family-role icon (Father, Mother, Grandma…), family
+management (rename, remove members, new invite code, leave), in-app account deletion, an in-app
+"How HomeBell works" guide, light/dark theme, and an optional per-phone
 **"Ring even on Silent / Do Not Disturb"**.
 
 | Ringing | Choose who rings | Locked phone |

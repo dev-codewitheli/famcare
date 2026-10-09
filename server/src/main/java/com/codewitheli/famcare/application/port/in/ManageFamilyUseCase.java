@@ -14,8 +14,8 @@ public interface ManageFamilyUseCase {
 
     FamilyView myFamily(AuthenticatedUser user);
 
-    /** Anyone can change what the family calls them. */
-    FamilyView renameMe(AuthenticatedUser user, String displayName);
+    /** Anyone can change what the family calls them and their icon; null leaves a field as is. */
+    FamilyView updateMe(AuthenticatedUser user, String displayName, String avatar);
 
     /** Family creator only. */
     FamilyView renameFamily(AuthenticatedUser user, String familyName);

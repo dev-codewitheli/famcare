@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'gate/gate_api.dart';
 import 'home/home_screen.dart';
+import 'settings/theme_preference.dart';
 
 class HomeBellApp extends StatelessWidget {
   const HomeBellApp({super.key, required this.config, required this.session, required this.gateApi});
@@ -15,11 +16,19 @@ class HomeBellApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: ThemePreference.instance,
+      builder: (context, themeMode, _) => _app(themeMode),
+    );
+  }
+
+  Widget _app(ThemeMode themeMode) {
     return MaterialApp(
       title: 'HomeBell',
       debugShowCheckedModeBanner: false,
       theme: FamilyTheme.light(_brand),
       darkTheme: FamilyTheme.dark(_brand),
+      themeMode: themeMode,
       // Phones fill the screen; on tablets, keep a readable column instead of stretching.
       builder: (context, child) => ColoredBox(
         color: Theme.of(context).colorScheme.surface,

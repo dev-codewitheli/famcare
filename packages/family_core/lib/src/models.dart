@@ -1,17 +1,21 @@
 enum MemberRole { parent, member }
 
 class Member {
-  const Member({required this.id, required this.displayName, required this.role});
+  const Member({required this.id, required this.displayName, required this.role, this.avatar});
 
   factory Member.fromJson(Map<String, dynamic> json) => Member(
-        id: json['id'] as String,
-        displayName: json['displayName'] as String,
-        role: MemberRole.values.byName((json['role'] as String).toLowerCase()),
-      );
+    id: json['id'] as String,
+    displayName: json['displayName'] as String,
+    role: MemberRole.values.byName((json['role'] as String).toLowerCase()),
+    avatar: json['avatar'] as String?,
+  );
 
   final String id;
   final String displayName;
   final MemberRole role;
+
+  /// A family-role icon key (see [memberIcons]), or null to show their initial.
+  final String? avatar;
 }
 
 class Family {
@@ -24,14 +28,12 @@ class Family {
   });
 
   factory Family.fromJson(Map<String, dynamic> json) => Family(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        inviteCode: json['inviteCode'] as String,
-        me: Member.fromJson(json['me'] as Map<String, dynamic>),
-        members: [
-          for (final m in json['members'] as List<dynamic>) Member.fromJson(m as Map<String, dynamic>),
-        ],
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    inviteCode: json['inviteCode'] as String,
+    me: Member.fromJson(json['me'] as Map<String, dynamic>),
+    members: [for (final m in json['members'] as List<dynamic>) Member.fromJson(m as Map<String, dynamic>)],
+  );
 
   final String id;
   final String name;

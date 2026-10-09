@@ -92,25 +92,22 @@ List<SetupStep> setupStepsFor(PhoneBrand brand) => [
         action: DeviceSettings.requestIgnoreBatteryOptimizations,
         check: DeviceSettings.isIgnoringBatteryOptimizations,
       ),
+      // One step for "can the ring be heard and seen": the alarm volume, and the "Gate rings"
+      // notification settings (whichever channel rings use here: the Silent/DND one when it's on).
       SetupStep(
-        id: 'alarm_volume',
+        id: 'ring_sound',
         icon: Icons.volume_up_rounded,
-        title: 'Turn up the alarm volume',
-        detail: 'Rings play at alarm volume, like an alarm clock.',
-        actionLabel: 'Sound settings',
-        action: DeviceSettings.openSoundSettings,
-        check: () async => await DeviceSettings.alarmVolumePercent() > 0,
-      ),
-      SetupStep(
-        id: 'ring_channel',
-        icon: Icons.lock_clock_rounded,
-        title: 'Keep the ring loud and visible',
-        detail: 'In "Gate rings", keep Sound, Pop-up and Lock screen on.',
-        actionLabel: 'Open',
-        // Whichever channel rings use on this phone (the Silent/DND one when that's switched on).
-        action: () async => DeviceSettings.openChannelSettings(await GateNotifications.activeRingChannelId()),
+        title: 'Make sure the ring can be heard',
+        detail: 'Keep the alarm volume up (rings play like an alarm clock), and in "Gate rings" keep '
+            'Sound, Pop-up and Lock screen on.',
+        actionLabel: 'Fix',
+        action: () async {
+          if (await DeviceSettings.alarmVolumePercent() == 0) return DeviceSettings.openSoundSettings();
+          await DeviceSettings.openChannelSettings(await GateNotifications.activeRingChannelId());
+        },
         check: () async =>
-            await DeviceSettings.ringChannelOk(await GateNotifications.activeRingChannelId()) ?? true,
+            await DeviceSettings.alarmVolumePercent() > 0 &&
+            (await DeviceSettings.ringChannelOk(await GateNotifications.activeRingChannelId()) ?? true),
       ),
       ..._brandSteps(brand),
     ];
@@ -136,19 +133,17 @@ List<SetupStep> _brandSteps(PhoneBrand brand) {
           action: DeviceSettings.openAutostartSettings,
           check: () => DeviceSettings.miuiOpAllowed(DeviceSettings.miuiAutostart),
         ),
+        // HomeBell no longer shows over the lock screen, so Xiaomi's "Show on Lock screen" isn't
+        // needed; background pop-ups still are, for the full-screen alert that wakes the screen.
         SetupStep(
-          id: 'xiaomi_lock_screen',
+          id: 'xiaomi_popups',
           icon: Icons.screen_lock_portrait_rounded,
-          title: 'Allow showing on the lock screen',
-          detail: 'Under "Other permissions", allow "Show on Lock screen" and '
-              '"Display pop-up windows while running in the background".',
+          title: 'Allow background pop-ups',
+          detail: 'Under "Other permissions", allow "Display pop-up windows while running in the background". '
+              'It lets a ring light up the screen.',
           actionLabel: 'Open permissions',
           action: DeviceSettings.openOemPermissions,
-          check: () async {
-            final locked = await DeviceSettings.miuiOpAllowed(DeviceSettings.miuiShowWhenLocked);
-            final popups = await DeviceSettings.miuiOpAllowed(DeviceSettings.miuiBackgroundPopups);
-            return locked == null || popups == null ? null : locked && popups;
-          },
+          check: () => DeviceSettings.miuiOpAllowed(DeviceSettings.miuiBackgroundPopups),
         ),
         lockInRecents,
       ],

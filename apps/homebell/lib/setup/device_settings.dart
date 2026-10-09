@@ -25,7 +25,6 @@ class DeviceSettings {
 
   /// Xiaomi app-op codes for settings outside standard Android.
   static const miuiAutostart = 10008;
-  static const miuiShowWhenLocked = 10020;
   static const miuiBackgroundPopups = 10021;
 
   /// Best effort on Xiaomi; null when it can't be read (other brands, or the OS hides it).

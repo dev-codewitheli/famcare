@@ -330,6 +330,29 @@ class GateAlertFlowTest {
     }
 
     @Test
+    void anyoneCanPickAnIconThatTheFamilySees() {
+        assertThat(patchMe("papa", "{\"avatar\": \"father\"}")).hasStatusOk();
+        // The nickname stays when only the icon changes, and the family sees the icon.
+        assertThat(mvc.get().uri("/api/families/mine").header("Authorization", "Bearer mama"))
+                .bodyJson()
+                .satisfies(json -> assertThat(json.getJson()).contains("\"displayName\":\"Papa\",\"role\":\"MEMBER\",\"avatar\":\"father\""));
+
+        assertThat(patchMe("papa", "{\"avatar\": \"\"}")).hasStatusOk()
+                .bodyJson().extractingPath("$.me.avatar").isNull();
+    }
+
+    @Test
+    void rejectsBadIconsAndBlankNicknames() {
+        assertThat(patchMe("papa", "{\"avatar\": \"<img src=x>\"}")).hasStatus(400);
+        assertThat(patchMe("papa", "{\"displayName\": \"   \"}")).hasStatus(400);
+    }
+
+    private MvcTestResult patchMe(String user, String json) {
+        return mvc.patch().uri("/api/families/mine/me").header("Authorization", "Bearer " + user)
+                .contentType(MediaType.APPLICATION_JSON).content(json).exchange();
+    }
+
+    @Test
     void onlyTheCreatorCanRenameTheFamily() {
         assertThat(mvc.patch().uri("/api/families/mine").header("Authorization", "Bearer papa")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"familyName\": \"Papa's\"}"))

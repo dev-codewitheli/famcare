@@ -46,16 +46,40 @@ class FamilyTheme {
   }
 }
 
-/// A round initial avatar with a stable color per person.
+/// A round avatar: the person's family-role icon, or their initial, with a stable color per person.
+/// Family-role icons a person can pick instead of their initial: no photos, so nothing personal
+/// is uploaded. Keys are what the server stores; unknown keys (from a newer app) show the initial.
+const memberIcons = <String, ({String emoji, String label})>{
+  'father': (emoji: '👨', label: 'Father'),
+  'mother': (emoji: '👩', label: 'Mother'),
+  'brother': (emoji: '👦', label: 'Brother'),
+  'sister': (emoji: '👧', label: 'Sister'),
+  'grandpa': (emoji: '👴', label: 'Grandpa'),
+  'grandma': (emoji: '👵', label: 'Grandma'),
+  'uncle': (emoji: '🧔', label: 'Uncle'),
+  'aunt': (emoji: '👩‍🦱', label: 'Aunt'),
+  'baby': (emoji: '👶', label: 'Baby'),
+  'person': (emoji: '🧑', label: 'Person'),
+};
+
 class MemberAvatar extends StatelessWidget {
-  const MemberAvatar({super.key, required this.name, this.radius = 22});
+  const MemberAvatar({super.key, required this.name, this.avatar, this.radius = 22});
 
   final String name;
+
+  /// A [memberIcons] key; null (or unknown) shows the first letter of [name].
+  final String? avatar;
   final double radius;
 
   static const _palette = [
-    Color(0xFFE07A1F), Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6),
-    Color(0xFFEF4444), Color(0xFF0EA5E9), Color(0xFFF59E0B), Color(0xFFEC4899),
+    Color(0xFFE07A1F),
+    Color(0xFF3B82F6),
+    Color(0xFF10B981),
+    Color(0xFF8B5CF6),
+    Color(0xFFEF4444),
+    Color(0xFF0EA5E9),
+    Color(0xFFF59E0B),
+    Color(0xFFEC4899),
   ];
 
   @override
@@ -64,13 +88,16 @@ class MemberAvatar extends StatelessWidget {
     // "Papa" and "Ate" the same color).
     final hash = name.toLowerCase().codeUnits.fold(7, (a, b) => (a * 31 + b) & 0x7fffffff);
     final color = _palette[hash % _palette.length];
+    final icon = memberIcons[avatar];
     return CircleAvatar(
       radius: radius,
       backgroundColor: color.withValues(alpha: 0.18),
-      child: Text(
-        name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: radius * 0.8),
-      ),
+      child: icon != null
+          ? Text(icon.emoji, style: TextStyle(fontSize: radius * 1.05, height: 1.1))
+          : Text(
+              name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+              style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: radius * 0.8),
+            ),
     );
   }
 }

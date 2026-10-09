@@ -24,6 +24,7 @@ class MemberEntity {
     private MemberRole role;
     private Instant joinedAt;
     private Instant removedAt;
+    private String avatar;
 
     protected MemberEntity() {
     }
@@ -37,6 +38,7 @@ class MemberEntity {
         authUid = "removed:" + id;
         if (anonymize) {
             displayName = "Former member";
+            avatar = null;
         }
     }
 
@@ -48,10 +50,11 @@ class MemberEntity {
         entity.displayName = member.displayName();
         entity.role = member.role();
         entity.joinedAt = member.joinedAt();
+        entity.avatar = member.avatar();
         return entity;
     }
 
     Member toDomain() {
-        return new Member(id, familyId, authUid, displayName, role, joinedAt);
+        return new Member(id, familyId, authUid, displayName, role, joinedAt, avatar);
     }
 }

@@ -43,7 +43,15 @@
       leavers don't block a ring); "Coming!" from the notification updates an open app at once;
       settings changes reach the background push handler; a tapped test ring stops
 
-## v0.6: FamCare (vitamin tracker)
+## v0.6: Final polish (done)
+- [x] A family is deleted with its history when its last member leaves or deletes their account
+- [x] Family-role icons (Father, Mother, Grandma…) instead of initials; no photos
+- [x] Heads-up for any number of minutes (up to an hour), not just 5/10/15/30
+- [x] Light / dark / automatic theme; in-app "How HomeBell works" guide (replaces the source link)
+- [x] Fewer setup steps (sound checks merged; Xiaomi "Show on Lock screen" dropped), all detected
+      automatically on Xiaomi, Samsung and stock Android; "Test the ring" lives in Phone setup
+
+## v0.7: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day
 - [ ] Daily checklist that resets at midnight (Asia/Manila); tick to mark as taken
 - [ ] Server-side "remind only if not taken yet" push at each scheduled time

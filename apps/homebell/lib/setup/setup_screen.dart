@@ -120,7 +120,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Test it', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text('Test the ring', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         const Text('Plays the ring on this phone. Lock the phone within a few seconds to '
                             'check the lock screen too.'),

@@ -6,7 +6,7 @@ import '../models.dart';
 import '../session.dart';
 import 'family_theme.dart';
 
-/// Members and the invite code. Everyone can change their nickname; the family's creator can
+/// Members and the invite code. Everyone can change their nickname and icon; the family's creator can
 /// also rename the family and remove members.
 class FamilyScreen extends StatelessWidget {
   const FamilyScreen({super.key, required this.session});
@@ -32,17 +32,37 @@ class _FamilyView extends StatelessWidget {
   final Session session;
   final Family family;
 
-  Future<void> _renameMe(BuildContext context) async {
-    final name = await _askForText(context,
-        title: 'Your nickname', label: 'What does the family call you?', initial: family.me.displayName, maxLength: 40);
-    if (name != null && context.mounted) {
-      await _attempt(context, () => session.renameMe(name), done: 'Nickname updated');
-    }
+  /// Nickname and icon, in one sheet.
+  Future<void> _editMe(BuildContext context) async {
+    final me = family.me;
+    final edit = await showModalBottomSheet<({String displayName, String avatar})>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _EditMeSheet(me: me),
+    );
+    if (edit == null || !context.mounted) return;
+    final nameChanged = edit.displayName != me.displayName;
+    final avatarChanged = edit.avatar != (me.avatar ?? '');
+    if (!nameChanged && !avatarChanged) return;
+    await _attempt(
+      context,
+      () => session.updateMe(
+        displayName: nameChanged ? edit.displayName : null,
+        avatar: avatarChanged ? edit.avatar : null,
+      ),
+      done: 'Saved. Your family will see the change.',
+    );
   }
 
   Future<void> _renameFamily(BuildContext context) async {
-    final name = await _askForText(context,
-        title: 'Family name', label: 'Family name', initial: family.name, maxLength: 80);
+    final name = await _askForText(
+      context,
+      title: 'Family name',
+      label: 'Family name',
+      initial: family.name,
+      maxLength: 80,
+    );
     if (name != null && context.mounted) {
       await _attempt(context, () => session.renameFamily(name), done: 'Family renamed');
     }
@@ -54,8 +74,10 @@ class _FamilyView extends StatelessWidget {
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.person_remove_rounded),
         title: Text('Remove ${member.displayName}?'),
-        content: Text('${member.displayName} will stop getting gate rings and heads-ups. '
-            'They can join again later with the invite code.'),
+        content: Text(
+          '${member.displayName} will stop getting gate rings and heads-ups. '
+          'They can join again later with the invite code.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
@@ -101,12 +123,16 @@ class _FamilyView extends StatelessWidget {
     }
   }
 
-  static Future<String?> _askForText(BuildContext context,
-          {required String title, required String label, required String initial, required int maxLength}) =>
-      showDialog<String>(
-        context: context,
-        builder: (_) => _TextPromptDialog(title: title, label: label, initial: initial, maxLength: maxLength),
-      );
+  static Future<String?> _askForText(
+    BuildContext context, {
+    required String title,
+    required String label,
+    required String initial,
+    required int maxLength,
+  }) => showDialog<String>(
+    context: context,
+    builder: (_) => _TextPromptDialog(title: title, label: label, initial: initial, maxLength: maxLength),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -143,24 +169,31 @@ class _FamilyView extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(family.inviteCode,
-                              style: theme.textTheme.displaySmall
-                                  ?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w800)),
+                          child: Text(
+                            family.inviteCode,
+                            style: theme.textTheme.displaySmall?.copyWith(
+                              letterSpacing: 6,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
                         IconButton.filledTonal(
                           tooltip: 'Copy',
                           icon: const Icon(Icons.copy_rounded),
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: family.inviteCode));
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(const SnackBar(content: Text('Invite code copied')));
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(const SnackBar(content: Text('Invite code copied')));
                           },
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text('Share it with family members so they can join from their phones.',
-                        style: theme.textTheme.bodySmall),
+                    Text(
+                      'Share it with family members so they can join from their phones.',
+                      style: theme.textTheme.bodySmall,
+                    ),
                     if (isCreator)
                       Align(
                         alignment: Alignment.centerLeft,
@@ -184,7 +217,7 @@ class _FamilyView extends StatelessWidget {
                     _MemberTile(
                       member: member,
                       isMe: member.id == family.me.id,
-                      onRenameMe: () => _renameMe(context),
+                      onEditMe: () => _editMe(context),
                       onRemove: isCreator && member.id != family.me.id ? () => _remove(context, member) : null,
                     ),
                 ],
@@ -192,8 +225,10 @@ class _FamilyView extends StatelessWidget {
             ),
             if (!isCreator) ...[
               const SizedBox(height: 12),
-              Text('Only the person who set up the family can rename it or remove members.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+              Text(
+                'Only the person who set up the family can rename it or remove members.',
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
             ],
             const SizedBox(height: 24),
             OutlinedButton.icon(
@@ -260,29 +295,152 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
 }
 
 class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.member, required this.isMe, required this.onRenameMe, this.onRemove});
+  const _MemberTile({required this.member, required this.isMe, required this.onEditMe, this.onRemove});
 
   final Member member;
   final bool isMe;
-  final VoidCallback onRenameMe;
+  final VoidCallback onEditMe;
   final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: MemberAvatar(name: member.displayName),
+      leading: MemberAvatar(name: member.displayName, avatar: member.avatar),
       title: Text(isMe ? '${member.displayName} (you)' : member.displayName),
-      subtitle: member.role == MemberRole.parent ? const Text('Set up the family') : null,
+      subtitle: member.role == MemberRole.parent
+          ? const Text('Set up the family')
+          : isMe
+          ? const Text('Tap to change your nickname or icon')
+          : null,
       trailing: isMe
-          ? IconButton(tooltip: 'Change nickname', icon: const Icon(Icons.edit_rounded), onPressed: onRenameMe)
+          ? IconButton(tooltip: 'Edit nickname and icon', icon: const Icon(Icons.edit_rounded), onPressed: onEditMe)
           : onRemove == null
-              ? null
-              : IconButton(
-                  tooltip: 'Remove from family',
-                  icon: Icon(Icons.person_remove_rounded, color: Theme.of(context).colorScheme.error),
-                  onPressed: onRemove,
-                ),
-      onTap: isMe ? onRenameMe : null,
+          ? null
+          : IconButton(
+              tooltip: 'Remove from family',
+              icon: Icon(Icons.person_remove_rounded, color: Theme.of(context).colorScheme.error),
+              onPressed: onRemove,
+            ),
+      onTap: isMe ? onEditMe : null,
+    );
+  }
+}
+
+/// My nickname and family-role icon. Pops with both (avatar '' = show my initial), or null.
+class _EditMeSheet extends StatefulWidget {
+  const _EditMeSheet({required this.me});
+
+  final Member me;
+
+  @override
+  State<_EditMeSheet> createState() => _EditMeSheetState();
+}
+
+class _EditMeSheetState extends State<_EditMeSheet> {
+  late final _name = TextEditingController(text: widget.me.displayName);
+  late String _avatar = memberIcons.containsKey(widget.me.avatar) ? widget.me.avatar! : '';
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(context, (displayName: name, avatar: _avatar));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final options = ['', ...memberIcons.keys];
+    return Padding(
+      // Keeps the field above the keyboard.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('You', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _name,
+                maxLength: 40,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nickname', helperText: 'What does the family call you?'),
+                onChanged: (_) => setState(() {}), // the initial avatar follows the name
+              ),
+              const SizedBox(height: 12),
+              Text('Icon', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final key in options)
+                    _IconChoice(
+                      label: key.isEmpty ? 'Initial' : memberIcons[key]!.label,
+                      selected: _avatar == key,
+                      onTap: () => setState(() => _avatar = key),
+                      child: MemberAvatar(
+                        name: _name.text.trim().isEmpty ? widget.me.displayName : _name.text.trim(),
+                        avatar: key.isEmpty ? null : key,
+                        radius: 24,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: _name.text.trim().isEmpty ? null : _save, child: const Text('Save')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconChoice extends StatelessWidget {
+  const _IconChoice({required this.label, required this.selected, required this.onTap, required this.child});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 72,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? colors.primary : Colors.transparent, width: 2),
+            color: selected ? colors.primaryContainer.withValues(alpha: 0.5) : null,
+          ),
+          child: Column(
+            children: [
+              child,
+              const SizedBox(height: 4),
+              Text(label, style: Theme.of(context).textTheme.labelSmall, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

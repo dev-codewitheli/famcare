@@ -7,6 +7,8 @@ import '../links.dart';
 import '../setup/device_settings.dart';
 import '../setup/phone_setup.dart';
 import '../setup/setup_screen.dart';
+import 'guide_screen.dart';
+import 'theme_preference.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.session});
@@ -131,16 +133,29 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                     subtitle: const Text('Rings play at alarm volume, so this phone won\'t make a sound.'),
                     trailing: TextButton(onPressed: DeviceSettings.openSoundSettings, child: const Text('Fix')),
                   ),
-                ListTile(
-                  leading: const Icon(Icons.notifications_active_rounded),
-                  title: const Text('Test the ring'),
-                  subtitle: const Text('Rings this phone in 5 seconds'),
-                  onTap: () => Future.delayed(const Duration(seconds: 5),
-                      () => GateNotifications.showRing(alertId: 'test', senderName: 'Test')),
-                  trailing: TextButton(
-                      onPressed: () => GateNotifications.cancelRing('test'), child: const Text('Stop')),
-                ),
               ],
+            ),
+          ),
+          _SectionTitle('Appearance'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ValueListenableBuilder(
+                valueListenable: ThemePreference.instance,
+                builder: (context, mode, _) => SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ThemeMode>(
+                    segments: const [
+                      ButtonSegment(
+                          value: ThemeMode.system, icon: Icon(Icons.brightness_auto_rounded), label: Text('Auto')),
+                      ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded), label: Text('Light')),
+                      ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded), label: Text('Dark')),
+                    ],
+                    selected: {mode},
+                    onSelectionChanged: (modes) => ThemePreference.instance.set(modes.single),
+                  ),
+                ),
+              ),
             ),
           ),
           _SectionTitle('This phone'),
@@ -210,17 +225,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.menu_book_rounded),
+                  title: const Text('How HomeBell works'),
+                  subtitle: const Text('Ringing, answering, heads-ups, and tips'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GuideScreen())),
+                ),
+                ListTile(
                   leading: const Icon(Icons.privacy_tip_rounded),
                   title: const Text('Privacy policy'),
                   trailing: const Icon(Icons.open_in_new_rounded),
                   onTap: () => Links.open(Links.privacyPolicy),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.code_rounded),
-                  title: const Text('Source code'),
-                  subtitle: const Text('HomeBell is open source'),
-                  trailing: const Icon(Icons.open_in_new_rounded),
-                  onTap: () => Links.open(Links.sourceCode),
                 ),
               ],
             ),

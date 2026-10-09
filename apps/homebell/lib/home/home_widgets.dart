@@ -39,7 +39,7 @@ class FamilyStrip extends StatelessWidget {
                           child: CircleAvatar(
                             radius: 20,
                             backgroundColor: theme.colorScheme.surface,
-                            child: MemberAvatar(name: m.displayName, radius: 18),
+                            child: MemberAvatar(name: m.displayName, avatar: m.avatar, radius: 18),
                           ),
                         ),
                     ],
@@ -269,7 +269,7 @@ class _RecipientsSheetState extends State<RecipientsSheet> {
                     CheckboxListTile(
                       value: !_leftOut.contains(m.id),
                       onChanged: (rung) => setState(() => rung! ? _leftOut.remove(m.id) : _leftOut.add(m.id)),
-                      secondary: MemberAvatar(name: m.displayName),
+                      secondary: MemberAvatar(name: m.displayName, avatar: m.avatar),
                       title: Text(m.displayName),
                     ),
                 ],
@@ -459,7 +459,7 @@ class OnTheWayCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         child: Row(
           children: [
-            MemberAvatar(name: arrival.member.displayName),
+            MemberAvatar(name: arrival.member.displayName, avatar: arrival.member.avatar),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -532,7 +532,8 @@ class OnMyWayCard extends StatelessWidget {
             Text('Give the family a heads-up so someone can head to the gate before you arrive. '
                 'We\'ll remind you when the time is up.', style: theme.textTheme.bodyMedium),
             const SizedBox(height: 12),
-            _chips(_etaOptions, (m) => '~$m min', Icons.schedule_rounded),
+            _chips(context, _etaOptions, (m) => '~$m min', Icons.schedule_rounded,
+                customTitle: 'How many minutes away?'),
           ],
         ),
       ),
@@ -556,7 +557,8 @@ class OnMyWayCard extends StatelessWidget {
             const SizedBox(height: 8),
             _SeenBy(arrival: mine),
             const SizedBox(height: 12),
-            _chips(_etaOptions, (m) => '~$m min', Icons.schedule_rounded),
+            _chips(context, _etaOptions, (m) => '~$m min', Icons.schedule_rounded,
+                customTitle: 'How many minutes away?'),
           ],
         ),
       ),
@@ -580,7 +582,8 @@ class OnMyWayCard extends StatelessWidget {
             const SizedBox(height: 8),
             _SeenBy(arrival: mine),
             const SizedBox(height: 12),
-            _chips(_delayOptions, (m) => '+$m min', Icons.more_time_rounded),
+            _chips(context, _delayOptions, (m) => '+$m min', Icons.more_time_rounded,
+                customTitle: 'Add how many minutes?'),
             const SizedBox(height: 8),
             Text('Hides on its own at ${formatClock(context, mine.hidesAt)}.',
                 style: theme.textTheme.bodySmall?.copyWith(color: colors.onTertiaryContainer)),
@@ -596,7 +599,10 @@ class OnMyWayCard extends StatelessWidget {
         label: const Text('Not coming'),
       );
 
-  Widget _chips(List<int> minutes, String Function(int) label, IconData icon) => Wrap(
+  /// Quick picks, plus "Other" for any number of minutes the server accepts.
+  Widget _chips(BuildContext context, List<int> minutes, String Function(int) label, IconData icon,
+          {required String customTitle}) =>
+      Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
@@ -606,8 +612,87 @@ class OnMyWayCard extends StatelessWidget {
               label: Text(label(m)),
               onPressed: busy ? null : () => onAnnounce(m),
             ),
+          ActionChip(
+            avatar: const Icon(Icons.tune_rounded, size: 18),
+            label: const Text('Other'),
+            onPressed: busy
+                ? null
+                : () async {
+                    final m = await showDialog<int>(
+                      context: context,
+                      builder: (_) => MinutesDialog(title: customTitle),
+                    );
+                    if (m != null) onAnnounce(m);
+                  },
+          ),
         ],
       );
+}
+
+/// Pick any number of minutes, 1 to [max] (the server's limit for a heads-up).
+class MinutesDialog extends StatefulWidget {
+  const MinutesDialog({super.key, required this.title, this.initial = 20});
+
+  final String title;
+  final int initial;
+
+  static const max = 60;
+
+  @override
+  State<MinutesDialog> createState() => _MinutesDialogState();
+}
+
+class _MinutesDialogState extends State<MinutesDialog> {
+  late int _minutes = widget.initial;
+
+  void _set(int m) => setState(() => _minutes = m.clamp(1, MinutesDialog.max));
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton.filledTonal(
+                tooltip: '1 minute less',
+                onPressed: _minutes > 1 ? () => _set(_minutes - 1) : null,
+                icon: const Icon(Icons.remove_rounded),
+              ),
+              SizedBox(
+                width: 110,
+                child: Text('$_minutes min',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+              ),
+              IconButton.filledTonal(
+                tooltip: '1 minute more',
+                onPressed: _minutes < MinutesDialog.max ? () => _set(_minutes + 1) : null,
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+          Slider(
+            value: _minutes.toDouble(),
+            min: 1,
+            max: MinutesDialog.max.toDouble(),
+            divisions: MinutesDialog.max - 1,
+            label: '$_minutes min',
+            onChanged: (v) => _set(v.round()),
+          ),
+          Text('Up to ${MinutesDialog.max} minutes', style: theme.textTheme.bodySmall),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, _minutes), child: const Text('Send')),
+      ],
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
