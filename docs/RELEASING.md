@@ -29,7 +29,7 @@ PowerShell from the repository root. (`[IO.File]` resolves relative paths agains
 folder, not PowerShell's location, hence `$PWD`.)
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("apps\homebell\android\app\google-services.json")) | Set-Clipboard
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\apps\homebell\android\app\google-services.json")) | Set-Clipboard
 ```
 
 ```powershell
