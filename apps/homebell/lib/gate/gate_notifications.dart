@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:family_core/family_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -26,7 +28,8 @@ class GateNotifications {
   static const headsUpPayloadPrefix = 'arrival:';
   static const duePayloadPrefix = 'arrival-due:';
 
-  /// Notification taps and "Coming!" presses while the app is running; HomeScreen consumes them.
+  /// Notification taps and heads-up buttons while the app is running; HomeScreen consumes them.
+  /// ("Coming!" on a ring is answered in the background: see onBackgroundNotificationAction.)
   static final responses = ValueNotifier<NotificationResponse?>(null);
 
   // Android fixes a channel's sound, audio usage and DND behavior when it's first created,
@@ -148,9 +151,13 @@ class GateNotifications {
     }
   }
 
+  /// The channel rings use on this phone: the DND-bypassing one when that's switched on and allowed.
+  static Future<String> activeRingChannelId() async =>
+      await RingSettings.ringThroughDnd() && await hasDndAccess() ? ringDndChannelId : ringChannelId;
+
   static Future<void> showRing({required String alertId, required String senderName}) async {
-    final throughDnd = await RingSettings.ringThroughDnd() && await hasDndAccess();
-    final channelId = throughDnd ? ringDndChannelId : ringChannelId;
+    final channelId = await activeRingChannelId();
+    final throughDnd = channelId == ringDndChannelId;
     return _plugin.show(
       id: _id(alertId),
       title: '$senderName is at the gate',
@@ -277,4 +284,10 @@ class GateNotifications {
   static Future<void> _cancel(String alertId) => _plugin.cancel(id: _id(alertId));
 
   static int _id(String key) => key.hashCode & 0x7fffffff;
+
+  /// Lets the background "Coming!" handler tell an open HomeScreen to refresh right away (the
+  /// server doesn't push the answer back to the person who answered).
+  static const answeredPortName = 'homebell_ring_answered';
+
+  static void notifyAnswered() => IsolateNameServer.lookupPortByName(answeredPortName)?.send(null);
 }

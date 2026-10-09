@@ -39,6 +39,9 @@
 - [x] Pick who "I'm at the gate" rings (e.g. not whoever is at school or work), remembered per phone
 - [x] The app no longer shows over the lock screen; a ring wakes the screen with a lock-screen
       notification, and "Coming!" works from it without unlocking
+- [x] 0.5.1 polish: the family list refreshes on resume and pull-to-refresh (newcomers get rung,
+      leavers don't block a ring); "Coming!" from the notification updates an open app at once;
+      settings changes reach the background push handler; a tapped test ring stops
 
 ## v0.6: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day

@@ -57,6 +57,7 @@ class FakeGateApi implements GateApi {
 
   @override
   Future<GateAlert> acknowledge(String id) async {
+    if (failWith != null) throw failWith!;
     acknowledged.add(id);
     activeAlert = null;
     return alert(sender: papa, status: GateAlertStatus.acknowledged, acknowledgedBy: me);

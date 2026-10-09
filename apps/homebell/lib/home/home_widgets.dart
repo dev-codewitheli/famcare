@@ -674,15 +674,12 @@ class HeadsUpSentDialog extends StatelessWidget {
       title: const Text('Heads-up sent'),
       content: Text(names.isEmpty
           ? 'Nobody else is in your family yet. Share the invite code so they get your heads-ups.'
-          : '${_joinNames(names)} ${names.length == 1 ? 'was' : 'were'} told you\'re about '
+          : '${joinNames(names)} ${names.length == 1 ? 'was' : 'were'} told you\'re about '
               '${arrival.etaMinutes} min away.\n\nWe\'ll remind you around $time to tap '
               '"I\'m at the gate", and you\'ll be notified when someone sees it.'),
       actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
     );
   }
-
-  static String _joinNames(List<String> names) =>
-      names.length <= 1 ? names.join() : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
 }
 
 class RecentActivity extends StatelessWidget {

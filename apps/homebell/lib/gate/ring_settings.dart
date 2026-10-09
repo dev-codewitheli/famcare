@@ -11,19 +11,25 @@ class RingSettings {
 
   /// "Ring even on Silent / Do Not Disturb". Off by default: someone may silence their phone
   /// on purpose (e.g. at night), and another family member can still open the gate.
-  static Future<bool> ringThroughDnd() async =>
-      (await SharedPreferences.getInstance()).getBool(_ringThroughDndKey) ?? false;
+  static Future<bool> ringThroughDnd() async => (await _prefs()).getBool(_ringThroughDndKey) ?? false;
 
   static Future<void> setRingThroughDnd(bool value) async =>
       (await SharedPreferences.getInstance()).setBool(_ringThroughDndKey, value);
 
   /// Who "I'm at the gate" leaves out (e.g. someone at school or work). Stores who's left out
   /// rather than who's rung, so a family member who joins later is rung by default.
-  static Future<Set<String>> leftOut() async =>
-      ((await SharedPreferences.getInstance()).getStringList(_leftOutKey) ?? const []).toSet();
+  static Future<Set<String>> leftOut() async => ((await _prefs()).getStringList(_leftOutKey) ?? const []).toSet();
 
   static Future<void> setLeftOut(Set<String> memberIds) async =>
       (await SharedPreferences.getInstance()).setStringList(_leftOutKey, memberIds.toList());
+
+  /// Reloaded on every read: the background push isolate keeps its own cached copy, which would
+  /// miss a change made in the app since (e.g. turning on "Ring even on Silent").
+  static Future<SharedPreferences> _prefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs;
+  }
 }
 
 /// The member ids to ring: everyone in [others] who isn't left out, or null (everyone) when

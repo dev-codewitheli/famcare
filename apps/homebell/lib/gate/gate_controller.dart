@@ -54,7 +54,12 @@ class GateController extends ChangeNotifier {
       _run(() async => _apply(await api.ring(recipientIds: recipientIds)));
 
   Future<void> coming(String alertId) => _run(() async {
-        await api.acknowledge(alertId);
+        try {
+          await api.acknowledge(alertId);
+        } on ApiException catch (e) {
+          // Already answered (maybe from the notification) or over: just show where things stand.
+          if (e.statusCode != 409) rethrow;
+        }
         await _sync();
       });
 

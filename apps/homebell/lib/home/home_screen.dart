@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:isolate';
+import 'dart:ui';
 
 import 'package:family_core/family_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -37,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription<RemoteMessage>? _pushes;
   bool _setupNeeded = false;
 
+  /// "Coming!" pressed on the notification while the app is open (answered in the background).
+  final _answeredInBackground = ReceivePort();
+
   /// Who "I'm at the gate" leaves out; remembered on this phone.
   Set<String> _leftOut = const {};
 
@@ -63,6 +68,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await Future.wait([_gate.refresh(), _activity.refresh()]);
       });
     }
+    IsolateNameServer.removePortNameMapping(GateNotifications.answeredPortName);
+    IsolateNameServer.registerPortWithName(_answeredInBackground.sendPort, GateNotifications.answeredPortName);
+    _answeredInBackground.listen((_) => Future.wait([_gate.refresh(), _activity.refresh()]));
     _startPolling();
     RingSettings.leftOut().then((ids) {
       if (mounted) setState(() => _leftOut = ids);
@@ -84,6 +92,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     GateNotifications.responses.removeListener(_onNotificationResponse);
     _gate.removeListener(_stopRingWhenAlertEnds);
+    IsolateNameServer.removePortNameMapping(GateNotifications.answeredPortName);
+    _answeredInBackground.close();
     _poll?.cancel();
     _pushes?.cancel();
     _gate.dispose();
@@ -96,6 +106,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _startPolling();
       _checkSetup();
+      // Someone may have joined or left: who can be rung comes from this list.
+      widget.session.refreshQuietly();
     } else if (state == AppLifecycleState.paused) {
       _poll?.cancel();
     }
@@ -140,7 +152,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// while the screen shows "… is at the gate" until someone actually answers.
   Future<void> _handleResponse(NotificationResponse? response) async {
     final payload = response?.payload;
-    if (payload == null || payload == 'test') return;
+    if (payload == null) return;
+    // Tapping a test ring opens the app; stop it, since there's no "Coming!" to end it.
+    if (payload == 'test') return GateNotifications.cancelRing('test');
     final action = response!.actionId;
 
     // "On my way" heads-up from someone else: "Got it".
@@ -162,12 +176,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       return _activity.refresh();
     }
-    // A gate ring.
-    if (action == GateNotifications.comingActionId) {
-      await _answer(payload);
-    } else {
-      await _gate.refresh();
-    }
+    // A tap on a gate ring ("Coming!" itself is answered in the background).
+    await _gate.refresh();
   }
 
   Future<void> _gotIt(String noticeId) async {
@@ -189,7 +199,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _ring() async {
     await GateNotifications.cancelDueReminder();
-    await _gate.ring(recipientIds: ringRecipientIds(_others, _leftOut));
+    // Read fresh: ringing from the "Time's up" notification can happen before initState's load.
+    final leftOut = await RingSettings.leftOut();
+    await _gate.ring(recipientIds: ringRecipientIds(_others, leftOut));
     await _activity.refresh();
   }
 
@@ -242,7 +254,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             final state = _gate.state;
             final canAnnounce = state is Idle || state is Outcome;
             return RefreshIndicator(
-              onRefresh: () => Future.wait([_gate.refresh(), _activity.refresh()]),
+              onRefresh: () =>
+                  Future.wait([_gate.refresh(), _activity.refresh(), widget.session.refreshQuietly()]),
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                 children: [
