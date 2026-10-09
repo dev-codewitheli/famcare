@@ -43,5 +43,11 @@ folder, not PowerShell's location, hence `$PWD`.)
 Optional repository **variable** (not secret) `HOMEBELL_API_BASE_URL` overrides the server URL
 (default `https://famcare-server.onrender.com`).
 
+**Google sign-in needs the release key's fingerprints in Firebase** (Project settings → Your
+apps → HomeBell → Add fingerprint), besides the debug ones from SETUP.md:
+
+- SHA-1 `A7:6A:45:C0:A4:E3:D1:9D:09:3A:D8:AF:21:0D:7B:4F:E8:71:97:96`
+- SHA-256 `20:75:39:1A:EB:00:18:CB:9C:EF:83:29:B0:36:7D:89:A6:40:6B:5D:71:19:91:7E:0B:03:4D:3E:D3:CC:A9:64`
+
 **The keystore must never change.** Android only installs an update over an existing app if
 it's signed with the same key, so keep `homebell-release.jks` backed up.

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release builds drop resources nothing references by ID. The notification icon is looked up
-     by name from Dart (AndroidInitializationSettings('ic_stat_bell')), so keep it explicitly. -->
+<!-- Release builds drop resources nothing references by ID. These are looked up by name at
+     runtime, so keep them explicitly:
+     - ic_stat_bell: the notification icon (AndroidInitializationSettings('ic_stat_bell')).
+     - default_web_client_id: generated from google-services.json; google_sign_in reads it as
+       the server client id, without which Google sign-in fails. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_bell" />
+    tools:keep="@drawable/ic_stat_bell,@string/default_web_client_id" />

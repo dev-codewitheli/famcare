@@ -81,6 +81,18 @@ jobs:
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$GITHUB_WORKSPACE/dist/HomeBell-$version-arm64.apk"
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "$GITHUB_WORKSPACE/dist/HomeBell-$version-arm32.apk"
 
+      # Resource shrinking silently drops resources looked up by name (0.4.0 froze on the
+      # splash screen, and sign-in failed, because of it). See res/raw/keep.xml.
+      - name: Check resources looked up by name survived shrinking
+        run: |
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2"
+          for apk in "$GITHUB_WORKSPACE"/dist/*.apk; do
+            resources="$("$aapt2" dump resources "$apk")"
+            for name in drawable/ic_stat_bell string/default_web_client_id; do
+              grep -q " $name\$" <<< "$resources" || { echo "::error::$name is missing from $(basename "$apk")"; exit 1; }
+            done
+          done
+
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
