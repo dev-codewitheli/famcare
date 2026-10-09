@@ -39,8 +39,6 @@
 - [x] Pick who "I'm at the gate" rings (e.g. not whoever is at school or work), remembered per phone
 - [x] The app no longer shows over the lock screen; a ring wakes the screen with a lock-screen
       notification, and "Coming!" works from it without unlocking
-- [x] When the last member leaves or deletes their account, the family and all its data are
-      deleted (server; the old invite code stops working)
 
 ## v0.6: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day
