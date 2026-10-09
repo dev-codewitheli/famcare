@@ -107,8 +107,10 @@ List<SetupStep> setupStepsFor(PhoneBrand brand) => [
         title: 'Keep the ring loud and visible',
         detail: 'In "Gate rings", keep Sound, Pop-up and Lock screen on.',
         actionLabel: 'Open',
-        action: () => DeviceSettings.openChannelSettings(GateNotifications.ringChannelId),
-        check: () async => await DeviceSettings.ringChannelOk(GateNotifications.ringChannelId) ?? true,
+        // Whichever channel rings use on this phone (the Silent/DND one when that's switched on).
+        action: () async => DeviceSettings.openChannelSettings(await GateNotifications.activeRingChannelId()),
+        check: () async =>
+            await DeviceSettings.ringChannelOk(await GateNotifications.activeRingChannelId()) ?? true,
       ),
       ..._brandSteps(brand),
     ];

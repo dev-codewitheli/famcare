@@ -1,3 +1,4 @@
+import 'package:family_core/family_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:homebell/gate/gate_api.dart';
 import 'package:homebell/gate/gate_controller.dart';
@@ -65,6 +66,19 @@ void main() {
   test('cancelling returns to idle', () async {
     await gate.ring();
     await gate.cancel('a1');
+    expect(gate.state, isA<Idle>());
+  });
+
+  test('"Coming!" on an alert that was already answered just refreshes, without an error', () async {
+    api.activeAlert = alert(sender: papa);
+    await gate.refresh();
+    // Answered meanwhile, e.g. from the notification's "Coming!".
+    api.activeAlert = null;
+    api.failWith = const ApiException(409, 'CONFLICT', 'Alert is already acknowledged');
+
+    await gate.coming('a1');
+
+    expect(gate.error, isNull);
     expect(gate.state, isA<Idle>());
   });
 }

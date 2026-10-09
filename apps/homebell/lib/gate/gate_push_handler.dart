@@ -36,9 +36,11 @@ Future<void> onBackgroundNotificationAction(NotificationResponse response) async
     }
     await auth.restore();
     await GateApi(ApiClient(baseUrl: config.apiBaseUrl, token: auth.idToken)).acknowledge(alertId);
+    GateNotifications.notifyAnswered();
   } on ApiException catch (e) {
     // Someone else answered first, or the person got in: nothing left to do.
-    if (e.statusCode != 409 && e.statusCode != 404) await _comingFailed(alertId);
+    if (e.statusCode != 409 && e.statusCode != 404) return _comingFailed(alertId);
+    GateNotifications.notifyAnswered();
   } catch (_) {
     await _comingFailed(alertId);
   }

@@ -120,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   secondary: const Icon(Icons.do_not_disturb_off_rounded),
                   title: const Text('Ring even on Silent / Do Not Disturb'),
                   subtitle: const Text('For whoever usually opens the gate. Off: a silenced phone stays quiet, '
-                      'and the rest of the family still gets the ring.'),
+                      'and the others you ring still get it.'),
                   value: _ringThroughDnd,
                   onChanged: _toggleDnd,
                 ),

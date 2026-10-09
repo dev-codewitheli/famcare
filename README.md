@@ -14,7 +14,8 @@ Built with **Flutter** (Android) + a little **Kotlin**, **Java 21 + Spring Boot 
 **hexagonal architecture** as [JobLens](https://github.com/dev-codewitheli/joblens).
 
 > **Privacy by design:** the server stores a nickname and a random sign-in ID per person, and
-> deletes gate activity after 90 days. Screenshots use a made-up family.
+> deletes gate activity after 90 days.
+> Screenshots use a made-up family.
 > [Privacy policy](https://dev-codewitheli.github.io/homebell/privacy.html)
 
 ---
@@ -38,9 +39,11 @@ Also: recent activity, editable nicknames, family management (rename, remove mem
 invite code, leave), in-app account deletion, and an optional per-phone
 **"Ring even on Silent / Do Not Disturb"**.
 
-| Ringing | Heads-up sent | Time's up | Phone setup |
-|---|---|---|---|
-| ![Someone at the gate](docs/screenshots/03-someone-at-gate.png) | ![Heads-up sent](docs/screenshots/04-heads-up-sent.png) | ![Time's up](docs/screenshots/06-times-up.png) | ![Phone setup](docs/screenshots/08-phone-setup.png) |
+| Ringing | Choose who rings | Locked phone |
+|---|---|---|
+| ![Someone at the gate](docs/screenshots/03-someone-at-gate.png) | ![Choose who rings](docs/screenshots/09-choose-who.png) | ![Ring on a locked phone](docs/screenshots/10-locked-phone.png) |
+| **Heads-up sent** | **Time's up** | **Phone setup** |
+| ![Heads-up sent](docs/screenshots/04-heads-up-sent.png) | ![Time's up](docs/screenshots/06-times-up.png) | ![Phone setup](docs/screenshots/08-phone-setup.png) |
 
 ### Why it's reliable (the interesting part)
 

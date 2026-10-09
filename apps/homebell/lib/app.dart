@@ -41,7 +41,7 @@ class HomeBellApp extends StatelessWidget {
               tagline: "Ring the family when you're at the gate.",
               icon: Icons.notifications_active_rounded,
               highlights: const [
-                SignInHighlight(Icons.ring_volume_rounded, 'One tap rings every phone at home, even locked'),
+                SignInHighlight(Icons.ring_volume_rounded, "One tap rings the family's phones, even locked"),
                 SignInHighlight(Icons.directions_run_rounded, 'See who\'s coming to open the gate'),
                 SignInHighlight(Icons.lock_rounded, 'Private: your family only sees a nickname'),
               ],

@@ -31,9 +31,13 @@ class Session extends ChangeNotifier {
 
   static const _memberIdKey = 'member_id';
 
-  /// This phone's member id, readable from push handlers in a background isolate.
-  static Future<String?> storedMemberId() async =>
-      (await SharedPreferences.getInstance()).getString(_memberIdKey);
+  /// This phone's member id, readable from push handlers in a background isolate. Reloads first:
+  /// each isolate caches preferences, and the app may have changed it since.
+  static Future<String?> storedMemberId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_memberIdKey);
+  }
 
   Future<void> start() async {
     await auth.restore();
@@ -51,6 +55,19 @@ class Session extends ChangeNotifier {
     } catch (e) {
       debugPrint('Session refresh failed: $e');
       _set(SessionStatus.error, "Can't reach the server. Check your connection.");
+    }
+  }
+
+  /// Re-reads the family (someone joined, left or was renamed) without leaving the screen on a
+  /// network error; only a removal or expired sign-in goes through the full [refresh].
+  Future<void> refreshQuietly() async {
+    if (_family == null) return;
+    try {
+      _update(await familyApi.mine());
+    } on ApiException catch (e) {
+      if (e.code == 'NOT_IN_FAMILY' || e.statusCode == 401) await refresh();
+    } catch (_) {
+      // Offline: keep what we have.
     }
   }
 
