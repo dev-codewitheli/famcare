@@ -16,9 +16,9 @@ jobs:
       run:
         working-directory: apps/homebell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -40,20 +40,28 @@ jobs:
           done
 
       # Same files a developer keeps locally (and out of git): Firebase config + signing key.
+      # Secrets pasted from a Windows clipboard end in "\r\n", which base64 rejects and which
+      # would become part of the password, so whitespace is stripped first.
       - name: Restore Firebase config and signing key
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/homebell-release.jks"
-          cat > android/key.properties <<EOF
-          storeFile=$RUNNER_TEMP/homebell-release.jks
-          storePassword=$KEYSTORE_PASSWORD
-          keyAlias=homebell
-          keyPassword=$KEYSTORE_PASSWORD
-          EOF
+          decode() { printf '%s' "$1" | tr -d '\r\n\t ' | base64 --decode; }
+          decode "$GOOGLE_SERVICES_JSON" > android/app/google-services.json \
+            || { echo "::error::GOOGLE_SERVICES_JSON is not valid base64"; exit 1; }
+          decode "$KEYSTORE_BASE64" > "$RUNNER_TEMP/homebell-release.jks" \
+            || { echo "::error::KEYSTORE_BASE64 is not valid base64"; exit 1; }
+          password="$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n')"
+          printf '%s\n' \
+            "storeFile=$RUNNER_TEMP/homebell-release.jks" \
+            "storePassword=$password" \
+            "keyAlias=homebell" \
+            "keyPassword=$password" > android/key.properties
+          # Fail here, with a clear message, rather than deep inside the Gradle build.
+          keytool -list -keystore "$RUNNER_TEMP/homebell-release.jks" -storepass "$password" -alias homebell > /dev/null \
+            || { echo "::error::KEYSTORE_PASSWORD doesn't open the keystore"; exit 1; }
 
       - name: Test
         run: |
