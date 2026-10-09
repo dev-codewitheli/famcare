@@ -155,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   ? 'Checking…'
                   : setup.allGood
                       ? 'Ready for ${setup.brand.label}'
-                      : '${setup.remaining} steps left for ${setup.brand.label}'),
+                      : '${setup.remaining} ${setup.remaining == 1 ? 'step' : 'steps'} left for ${setup.brand.label}'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () => Navigator.of(context)
                   .push(MaterialPageRoute(builder: (_) => const SetupScreen()))

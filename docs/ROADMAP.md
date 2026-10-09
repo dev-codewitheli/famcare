@@ -27,7 +27,15 @@
 - [x] Edit nickname; family creator renames the family and removes members
 - [x] Recent activity capped at 5; phone setup without duplicate steps, Xiaomi checks automatic
 
-## v0.4: FamCare (vitamin tracker)
+## v0.4: HomeBell polish for release (done)
+- [x] Clearer time's-up card: no duplicate ring button, "Not coming", auto-hide time
+- [x] Leave family, delete account (Play requirement), new invite code
+- [x] Signed-out phones stop ringing; nightly retention (90 days of gate activity)
+- [x] Adaptive/themed icon, status-bar icon, branded splash, tablet-friendly layout
+- [x] Privacy policy page, Crashlytics, release workflow (tag → signed APKs on GitHub Releases)
+- [x] README screenshots and portfolio card
+
+## v0.5: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day
 - [ ] Daily checklist that resets at midnight (Asia/Manila); tick to mark as taken
 - [ ] Server-side "remind only if not taken yet" push at each scheduled time
@@ -35,13 +43,13 @@
 - [ ] History and streaks
 - [ ] Low-stock reminder ("Fish oil: about 5 days left")
 
-## v0.5: one-tap extras
+## v0.6: one-tap extras
 - [ ] NFC sticker at the gate: tap your phone on it to ring
 - [ ] Quick Settings tile: "Gate" in the notification shade (Kotlin `TileService`)
 - [ ] Home-screen widgets: gate button, today's vitamins
 - [ ] Optional "almost home" heads-up (geofence ~300–500 m, opt-in)
 
 ## Portfolio polish
-- [ ] Public demo with made-up data that resets nightly
-- [ ] Screenshots and a short GIF (demo data only)
-- [ ] GitHub Actions: server tests, Flutter analyze/test, APK build attached to releases
+- [ ] Public demo with made-up data that resets nightly (optional web build)
+- [x] Screenshots (demo data only)
+- [x] GitHub Actions: tests on every push, signed APKs attached to releases

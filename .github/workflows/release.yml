@@ -1,0 +1,85 @@
+name: Release HomeBell
+
+# Push a tag like v0.4.0 to build the signed APKs and publish a GitHub Release.
+# Needs the repository secrets described in docs/RELEASING.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/homebell
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.x
+          cache: true
+
+      - name: Check release secrets
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          for name in GOOGLE_SERVICES_JSON KEYSTORE_BASE64 KEYSTORE_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing secret $name (see docs/RELEASING.md)"; exit 1; fi
+          done
+
+      # Same files a developer keeps locally (and out of git): Firebase config + signing key.
+      - name: Restore Firebase config and signing key
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/homebell-release.jks"
+          cat > android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/homebell-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=homebell
+          keyPassword=$KEYSTORE_PASSWORD
+          EOF
+
+      - name: Test
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build signed APKs
+        env:
+          API_BASE_URL: ${{ vars.HOMEBELL_API_BASE_URL || 'https://famcare-server.onrender.com' }}
+        run: |
+          flutter build apk --release --split-per-abi \
+            --dart-define=AUTH_MODE=firebase \
+            --dart-define=API_BASE_URL="$API_BASE_URL"
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$GITHUB_WORKSPACE/dist/HomeBell-$version-arm64.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "$GITHUB_WORKSPACE/dist/HomeBell-$version-arm32.apk"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true
+          body: |
+            **Download:** `HomeBell-…-arm64.apk` for almost all phones from the last ~8 years;
+            `…-arm32.apk` only for older or budget phones where arm64 won't install.
+
+            After installing, open HomeBell → Settings → Phone setup and finish every step so
+            rings get through. Privacy policy: https://dev-codewitheli.github.io/homebell/privacy.html
