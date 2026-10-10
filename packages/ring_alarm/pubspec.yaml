@@ -1,0 +1,23 @@
+name: ring_alarm
+description: "Plays HomeBell's gate ring on the alarm stream (like an alarm clock), so it's heard on Silent."
+version: 1.0.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.devcodewitheli.ring_alarm
+        pluginClass: RingAlarmPlugin

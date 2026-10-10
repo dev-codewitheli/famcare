@@ -105,9 +105,14 @@ List<SetupStep> setupStepsFor(PhoneBrand brand) => [
           if (await DeviceSettings.alarmVolumePercent() == 0) return DeviceSettings.openSoundSettings();
           await DeviceSettings.openChannelSettings(await GateNotifications.activeRingChannelId());
         },
-        check: () async =>
-            await DeviceSettings.alarmVolumePercent() > 0 &&
-            (await DeviceSettings.ringChannelOk(await GateNotifications.activeRingChannelId()) ?? true),
+        check: () async {
+          if (await DeviceSettings.alarmVolumePercent() == 0) return false;
+          final channel = await GateNotifications.activeRingChannelId();
+          // The Silent/DND channel is silent on purpose: its sound plays at alarm volume instead.
+          return await DeviceSettings.ringChannelOk(channel,
+                  requireSound: channel != GateNotifications.ringDndChannelId) ??
+              true;
+        },
       ),
       ..._brandSteps(brand),
     ];

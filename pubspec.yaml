@@ -6,3 +6,4 @@ environment:
 workspace:
   - packages/family_core
   - apps/homebell
+  - packages/ring_alarm

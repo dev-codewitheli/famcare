@@ -4,6 +4,7 @@ import 'package:family_core/family_core.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ring_alarm/ring_alarm.dart';
 
 import 'gate_api.dart';
 import 'gate_notifications.dart';
@@ -22,9 +23,12 @@ Future<void> onBackgroundGatePush(RemoteMessage message) async {
 /// so the ring stops at once.
 @pragma('vm:entry-point')
 Future<void> onBackgroundNotificationAction(NotificationResponse response) async {
-  final alertId = response.payload;
-  if (response.actionId != GateNotifications.comingActionId || alertId == null || alertId == 'test') return;
+  if (response.actionId != GateNotifications.comingActionId) return;
   DartPluginRegistrant.ensureInitialized();
+  // The plugin already removed the notification; the alarm sound (Silent/DND mode) stops here.
+  await RingAlarm.stop();
+  final alertId = response.payload;
+  if (alertId == null || alertId == 'test') return;
   try {
     final config = AppConfig.fromEnvironment();
     final AuthService auth;

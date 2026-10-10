@@ -37,7 +37,8 @@ class GuideScreen extends StatelessWidget {
       Icons.do_not_disturb_off_rounded,
       'Silent and Do Not Disturb',
       'By default, a phone on Silent or Do Not Disturb stays quiet. Whoever usually opens the gate '
-          'can turn on "Ring even on Silent / Do Not Disturb" in Settings.',
+          'can turn on "Ring even on Silent / Do Not Disturb" in Settings: the ring then plays at alarm '
+          'volume, like an alarm clock, with a "Stop sound" button in its notification.',
     ),
     _Section(
       Icons.verified_rounded,

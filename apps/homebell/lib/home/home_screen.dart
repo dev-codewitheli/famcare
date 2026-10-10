@@ -153,8 +153,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _handleResponse(NotificationResponse? response) async {
     final payload = response?.payload;
     if (payload == null) return;
-    // Tapping a test ring opens the app; stop it, since there's no "Coming!" to end it.
-    if (payload == 'test') return GateNotifications.cancelRing('test');
+    // A test ring keeps going until "Coming!" on it, Stop in Phone setup, or its timeout. Don't
+    // stop it here: on a locked phone the full-screen alert opens the app exactly like a tap,
+    // which would end the test before it can show the lock screen.
+    if (payload == 'test') return;
     final action = response!.actionId;
 
     // "On my way" heads-up from someone else: "Got it".

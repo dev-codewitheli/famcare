@@ -50,6 +50,8 @@
 - [x] Light / dark / automatic theme; in-app "How HomeBell works" guide (replaces the source link)
 - [x] Fewer setup steps (sound checks merged; Xiaomi "Show on Lock screen" dropped), all detected
       automatically on Xiaomi, Samsung and stock Android; "Test the ring" lives in Phone setup
+- [x] 0.6.1: "Ring even on Silent / DND" now really rings: the sound plays at alarm volume from a
+      foreground service (like an alarm clock), since Silent mode mutes notification sounds
 
 ## v0.7: FamCare (vitamin tracker)
 - [ ] Each person's vitamins: name, dose, time(s) of day

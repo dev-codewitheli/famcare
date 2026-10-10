@@ -20,8 +20,8 @@ class DeviceSettings {
       await _channel.invokeMethod<int>('alarmVolumePercent') ?? 100;
 
   /// Whether the ring channel still has sound and pop-up on (null if it doesn't exist yet).
-  static Future<bool?> ringChannelOk(String channelId) =>
-      _channel.invokeMethod<bool>('ringChannelOk', {'channelId': channelId});
+  static Future<bool?> ringChannelOk(String channelId, {bool requireSound = true}) =>
+      _channel.invokeMethod<bool>('ringChannelOk', {'channelId': channelId, 'requireSound': requireSound});
 
   /// Xiaomi app-op codes for settings outside standard Android.
   static const miuiAutostart = 10008;

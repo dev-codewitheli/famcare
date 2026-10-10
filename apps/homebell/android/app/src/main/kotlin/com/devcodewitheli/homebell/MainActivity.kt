@@ -29,7 +29,8 @@ class MainActivity : FlutterActivity() {
                     "isIgnoringBatteryOptimizations" -> result.success(isIgnoringBatteryOptimizations())
                     "manufacturer" -> result.success(Build.MANUFACTURER)
                     "alarmVolumePercent" -> result.success(alarmVolumePercent())
-                    "ringChannelOk" -> result.success(ringChannelOk(call.argument<String>("channelId")!!))
+                    "ringChannelOk" -> result.success(
+                        ringChannelOk(call.argument<String>("channelId")!!, call.argument<Boolean>("requireSound") ?: true))
                     "miuiOpAllowed" -> result.success(miuiOpAllowed(call.argument<Int>("op")!!))
                     "requestIgnoreBatteryOptimizations" -> {
                         // Shows the system "Let app always run in background?" dialog.
@@ -77,13 +78,14 @@ class MainActivity : FlutterActivity() {
 
     /**
      * The user can turn a channel's sound or pop-up off in system settings; this catches that.
-     * Null if the channel doesn't exist yet.
+     * Null if the channel doesn't exist yet. [requireSound] is false for the Silent/DND channel,
+     * which is silent on purpose (the sound plays on the alarm stream instead).
      */
-    private fun ringChannelOk(channelId: String): Boolean? {
+    private fun ringChannelOk(channelId: String, requireSound: Boolean): Boolean? {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = manager.getNotificationChannel(channelId) ?: return null
         return channel.importance >= NotificationManager.IMPORTANCE_HIGH &&
-            channel.sound != null &&
+            (!requireSound || channel.sound != null) &&
             channel.lockscreenVisibility != Notification.VISIBILITY_SECRET
     }
 

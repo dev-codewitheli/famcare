@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:family_core/family_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ring_alarm/ring_alarm.dart';
 
 import 'gate_push_handler.dart';
 import 'ring_settings.dart';
@@ -35,7 +36,12 @@ class GateNotifications {
   // Android fixes a channel's sound, audio usage and DND behavior when it's first created,
   // so changing them later needs a new channel id.
   static const ringChannelId = 'gate_ring_v1';
-  static const ringDndChannelId = 'gate_ring_dnd_v1';
+
+  /// "Ring even on Silent / DND": a silent channel that gets through DND, while the sound plays
+  /// separately on the alarm stream (RingAlarm). v1 played the sound through the notification,
+  /// which Silent/vibrate mode mutes regardless of the channel.
+  static const ringDndChannelId = 'gate_ring_dnd_v2';
+  static const _oldRingDndChannelIds = ['gate_ring_dnd_v1'];
   static const _updatesChannelId = 'gate_updates_v1';
   static const _arrivalsChannelId = 'arrivals_v1';
 
@@ -56,6 +62,8 @@ class GateNotifications {
     );
     final android = _android;
     await android?.createNotificationChannel(_ringChannel(ringChannelId, bypassDnd: false));
+    // Also moves phones that turned "Ring even on Silent" on in an older version to the new channel.
+    await ensureDndChannel();
     await android?.createNotificationChannel(const AndroidNotificationChannel(
       _updatesChannelId,
       'Gate updates',
@@ -70,17 +78,27 @@ class GateNotifications {
     ));
   }
 
-  static AndroidNotificationChannel _ringChannel(String id, {required bool bypassDnd}) =>
-      AndroidNotificationChannel(
-        id,
-        bypassDnd ? 'Gate rings (through Silent / DND)' : 'Gate rings',
-        description: 'Someone in the family is waiting at the gate',
-        importance: Importance.max,
-        bypassDnd: bypassDnd,
-        sound: _alarmSound,
-        vibrationPattern: _vibration,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
-      );
+  /// The normal ring channel plays the alarm sound itself; the Silent/DND one is silent because
+  /// RingAlarm plays the sound and vibration (see [ringDndChannelId]).
+  static AndroidNotificationChannel _ringChannel(String id, {required bool bypassDnd}) => bypassDnd
+      ? AndroidNotificationChannel(
+          id,
+          'Gate rings (through Silent / DND)',
+          description: 'Someone in the family is waiting at the gate. The sound plays at alarm volume.',
+          importance: Importance.max,
+          bypassDnd: true,
+          playSound: false,
+          enableVibration: false,
+        )
+      : AndroidNotificationChannel(
+          id,
+          'Gate rings',
+          description: 'Someone in the family is waiting at the gate',
+          importance: Importance.max,
+          sound: _alarmSound,
+          vibrationPattern: _vibration,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+        );
 
   static AndroidFlutterLocalNotificationsPlugin? get _android =>
       _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -110,6 +128,9 @@ class GateNotifications {
   static Future<void> ensureDndChannel() async {
     if (await hasDndAccess()) {
       await _android?.createNotificationChannel(_ringChannel(ringDndChannelId, bypassDnd: true));
+    }
+    for (final old in _oldRingDndChannelIds) {
+      await _android?.deleteNotificationChannel(channelId: old);
     }
   }
 
@@ -158,9 +179,10 @@ class GateNotifications {
   static Future<void> showRing({required String alertId, required String senderName}) async {
     final channelId = await activeRingChannelId();
     final throughDnd = channelId == ringDndChannelId;
-    return _plugin.show(
+    final title = '$senderName is at the gate';
+    await _plugin.show(
       id: _id(alertId),
-      title: '$senderName is at the gate',
+      title: title,
       body: 'Tap "Coming!" so they know someone is on the way.',
       payload: alertId,
       notificationDetails: NotificationDetails(
@@ -175,10 +197,13 @@ class GateNotifications {
           // doesn't show over the lock screen: the phone stays locked, and "Coming!" works
           // right from the notification.
           fullScreenIntent: true,
+          // Through Silent/DND the notification stays silent and RingAlarm plays the sound.
+          playSound: !throughDnd,
+          enableVibration: !throughDnd,
           audioAttributesUsage: AudioAttributesUsage.alarm,
-          sound: _alarmSound,
-          vibrationPattern: _vibration,
-          additionalFlags: Int32List.fromList([_flagInsistent]),
+          sound: throughDnd ? null : _alarmSound,
+          vibrationPattern: throughDnd ? null : _vibration,
+          additionalFlags: throughDnd ? null : Int32List.fromList([_flagInsistent]),
           ongoing: true,
           autoCancel: false,
           visibility: NotificationVisibility.public,
@@ -191,6 +216,9 @@ class GateNotifications {
         ),
       ),
     );
+    // Like an alarm clock: the alarm stream isn't muted by Silent/vibrate mode. Each re-ring
+    // just restarts its 3-minute safety timer.
+    if (throughDnd) await RingAlarm.start(title: title);
   }
 
   /// "Coming!" from the notification couldn't reach the server.
@@ -281,7 +309,11 @@ class GateNotifications {
 
   static Future<void> cancelRing(String alertId) => _cancel(alertId);
 
-  static Future<void> _cancel(String alertId) => _plugin.cancel(id: _id(alertId));
+  /// Stops a ring: its notification, and the alarm sound if "Ring even on Silent" was playing it.
+  static Future<void> _cancel(String alertId) async {
+    await _plugin.cancel(id: _id(alertId));
+    await RingAlarm.stop();
+  }
 
   static int _id(String key) => key.hashCode & 0x7fffffff;
 
